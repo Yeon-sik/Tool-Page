@@ -1,258 +1,4 @@
-const toolConfigs = {
-  "png-to-jpg": {
-    mode: "image",
-    outputExtension: "jpg",
-    mimeType: "image/jpeg",
-    quality: 0.92,
-    statusReady: "PNG 파일 변환 준비가 완료되었습니다.",
-    statusDone: "JPG 변환이 완료되었습니다.",
-    downloadAllLabel: "ZIP 다운로드",
-    settings: [
-      {
-        key: "jpegQuality",
-        label: "JPG 품질",
-        description: "값이 높을수록 선명하지만 파일 크기가 커집니다.",
-        type: "range",
-        min: 0.6,
-        max: 1,
-        step: 0.01,
-        defaultValue: 0.92,
-        valueLabel: (value) => `${Math.round(value * 100)}%`,
-      },
-      {
-        key: "jpegBackground",
-        label: "배경색",
-        description: "투명한 PNG를 JPG로 바꿀 때 채워질 배경색입니다.",
-        type: "color",
-        defaultValue: "#ffffff",
-      },
-    ],
-  },
-  "jpg-to-png": {
-    mode: "image",
-    outputExtension: "png",
-    mimeType: "image/png",
-    quality: 1,
-    statusReady: "JPG 파일 변환 준비가 완료되었습니다.",
-    statusDone: "PNG 변환이 완료되었습니다.",
-    downloadAllLabel: "ZIP 다운로드",
-  },
-  "webp-to-png": {
-    mode: "image",
-    outputExtension: "png",
-    mimeType: "image/png",
-    quality: 1,
-    statusReady: "WEBP 파일 변환 준비가 완료되었습니다.",
-    statusDone: "PNG 변환이 완료되었습니다.",
-    downloadAllLabel: "ZIP 다운로드",
-  },
-  "images-to-pdf": {
-    mode: "pdf",
-    outputExtension: "pdf",
-    mimeType: "application/pdf",
-    statusReady: "카드를 드래그해 PDF 페이지 순서를 조정할 수 있습니다.",
-    statusDone: "PDF 생성이 완료되었습니다.",
-    downloadAllLabel: "PDF 다운로드",
-    reorderable: true,
-    settings: [
-      {
-        key: "pdfPageSize",
-        label: "페이지 크기",
-        description: "출력 문서의 기본 용지 크기를 선택합니다.",
-        type: "select",
-        defaultValue: "a4",
-        options: [
-          { value: "a4", label: "A4" },
-          { value: "letter", label: "Letter" },
-        ],
-      },
-      {
-        key: "pdfOrientation",
-        label: "페이지 방향",
-        description: "자동은 이미지 비율에 맞춰 세로와 가로를 정합니다.",
-        type: "select",
-        defaultValue: "auto",
-        options: [
-          { value: "auto", label: "자동" },
-          { value: "portrait", label: "세로" },
-          { value: "landscape", label: "가로" },
-        ],
-      },
-      {
-        key: "pdfImageFormat",
-        label: "이미지 인코딩",
-        description: "PNG 유지는 투명을 살리고, JPG 압축은 용량을 줄입니다.",
-        type: "select",
-        defaultValue: "auto",
-        options: [
-          { value: "auto", label: "자동" },
-          { value: "png", label: "PNG 유지" },
-          { value: "jpeg", label: "JPG 압축" },
-        ],
-      },
-      {
-        key: "pdfJpegQuality",
-        label: "JPG 품질",
-        description: "PDF를 JPG로 압축할 때의 화질 수준입니다.",
-        type: "range",
-        min: 0.6,
-        max: 1,
-        step: 0.01,
-        defaultValue: 0.92,
-        valueLabel: (value) => `${Math.round(value * 100)}%`,
-      },
-      {
-        key: "pdfDpi",
-        label: "출력 해상도",
-        description: "높을수록 더 선명하지만 생성 시간과 용량이 늘어납니다.",
-        type: "select",
-        defaultValue: "150",
-        options: [
-          { value: "96", label: "96 DPI" },
-          { value: "150", label: "150 DPI" },
-          { value: "200", label: "200 DPI" },
-        ],
-      },
-      {
-        key: "pdfBackground",
-        label: "평탄화 배경",
-        description: "투명 이미지를 JPG로 넣을 때 사용할 배경색입니다.",
-        type: "color",
-        defaultValue: "#ffffff",
-      },
-    ],
-  },
-  "images-to-pptx": {
-    mode: "pptx",
-    outputExtension: "pptx",
-    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    statusReady: "카드를 드래그해 PPTX 슬라이드 순서를 조정할 수 있습니다.",
-    statusDone: "PPTX 생성이 완료되었습니다.",
-    downloadAllLabel: "PPTX 다운로드",
-    reorderable: true,
-    settings: [
-      {
-        key: "pptxDpi",
-        label: "슬라이드 해상도",
-        description: "슬라이드에 배치할 이미지의 렌더링 해상도입니다.",
-        type: "select",
-        defaultValue: "144",
-        options: [
-          { value: "96", label: "96 DPI" },
-          { value: "144", label: "144 DPI" },
-          { value: "192", label: "192 DPI" },
-        ],
-      },
-      {
-        key: "pptxBackground",
-        label: "슬라이드 배경",
-        description: "슬라이드 바탕색과 꽉 채우기 모드의 빈 영역 색상입니다.",
-        type: "color",
-        defaultValue: "#000000",
-      },
-      {
-        key: "pptxFileLabel",
-        label: "파일명 표시",
-        description: "각 슬라이드 하단에 원본 파일명을 함께 넣습니다.",
-        type: "checkbox",
-        defaultValue: true,
-      },
-      {
-        key: "pptxFitMode",
-        label: "배치 방식",
-        description: "전체 맞춤은 잘림 없이 배치하고, 꽉 채우기는 화면을 가득 채웁니다.",
-        type: "select",
-        defaultValue: "contain",
-        options: [
-          { value: "contain", label: "전체 맞춤" },
-          { value: "cover", label: "꽉 채우기" },
-        ],
-      },
-    ],
-  },
-  "images-to-gif": {
-    mode: "gif",
-    outputExtension: "gif",
-    mimeType: "image/gif",
-    statusReady: "카드를 드래그해 GIF 프레임 순서를 조정할 수 있습니다.",
-    statusDone: "GIF 생성이 완료되었습니다.",
-    downloadAllLabel: "GIF 다운로드",
-    reorderable: true,
-    settings: [
-      {
-        key: "gifFrameDelay",
-        label: "기본 프레임 지연",
-        description: "각 프레임의 기본 재생 시간을 밀리초 단위로 정합니다.",
-        type: "range",
-        min: 60,
-        max: 1200,
-        step: 20,
-        defaultValue: 180,
-        valueLabel: (value) => `${value}ms`,
-      },
-      {
-        key: "gifMaxWidth",
-        label: "출력 너비",
-        description: "첫 프레임 기준 캔버스 너비를 정해 용량과 선명도를 조절합니다.",
-        type: "select",
-        defaultValue: "720",
-        options: [
-          { value: "original", label: "원본 유지" },
-          { value: "480", label: "480px" },
-          { value: "720", label: "720px" },
-          { value: "960", label: "960px" },
-        ],
-      },
-      {
-        key: "gifFitMode",
-        label: "배치 방식",
-        description: "전체 맞춤은 잘림 없이 배치하고, 꽉 채우기는 캔버스를 가득 채웁니다.",
-        type: "select",
-        defaultValue: "contain",
-        options: [
-          { value: "contain", label: "전체 맞춤" },
-          { value: "cover", label: "꽉 채우기" },
-        ],
-      },
-      {
-        key: "gifRepeat",
-        label: "반복 재생",
-        description: "무한 반복 또는 지정 횟수만큼 재생되도록 설정합니다.",
-        type: "select",
-        defaultValue: "0",
-        options: [
-          { value: "0", label: "무한 반복" },
-          { value: "1", label: "1회 재생" },
-          { value: "3", label: "3회 반복" },
-        ],
-      },
-      {
-        key: "gifQualityProfile",
-        label: "품질 프로필",
-        description: "고품질일수록 계단 현상이 줄지만 생성 시간이 늘어납니다.",
-        type: "select",
-        defaultValue: "balanced",
-        options: [
-          { value: "smaller", label: "작은 파일" },
-          { value: "balanced", label: "균형" },
-          { value: "sharp", label: "고품질" },
-        ],
-      },
-      {
-        key: "gifBackground",
-        label: "배경색",
-        description: "여백이나 투명 영역을 채울 배경색입니다.",
-        type: "color",
-        defaultValue: "#000000",
-      },
-    ],
-  },
-};
-
-const pageFormats = {
-  a4: { jsPdfFormat: "a4" },
-  letter: { jsPdfFormat: "letter" },
-};
+const toolConfigs = {};
 
 const sharedOutputSettings = [
   {
@@ -302,14 +48,48 @@ const sharedOutputSettings = [
   },
 ];
 
-const GIF_WORKER_CDN_URL = "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js";
-let gifWorkerScriptUrlPromise = null;
+const ToolPage = {
+  assertJobActive,
+  blobToDataUrl,
+  buildBundleFileName,
+  buildDocumentImageFileName,
+  buildOutputFileName,
+  canvasToBlob,
+  coverWithinBox,
+  createCanvasImageResult,
+  createImageResults,
+  createRenderedImagePreview,
+  createZipBlob,
+  downloadBlob,
+  fitWithinBox,
+  formatFileSize,
+  isJobActive,
+  loadImage,
+  loadImageFromDataUrl,
+  normalizeHexColor,
+  registerTool,
+  removeFileAtIndex,
+  renderImageToBlob,
+  renderState,
+  resolvePageImageOutput,
+  sanitizeFileNameSegment,
+  stripExtension,
+};
+
+window.ToolPage = ToolPage;
 
 document.addEventListener("DOMContentLoaded", () => {
   if (document.body.dataset.page === "tool") {
     initializeToolPage();
   }
 });
+
+function registerTool(toolName, config) {
+  toolConfigs[toolName] = {
+    ...config,
+    name: toolName,
+  };
+}
 
 function initializeToolPage() {
   const panel = document.querySelector("[data-tool]");
@@ -341,6 +121,7 @@ function initializeToolPage() {
     results: [],
     previews: [],
     frameSettings: [],
+    fileSettings: [],
     dragIndex: null,
     dropInsertionIndex: null,
     pointerDrag: null,
@@ -363,6 +144,10 @@ function initializeToolPage() {
   state.dropTarget = ensureDropTarget(state);
   state.settingsRoot = renderSettingsPanel(panel, state);
   setupDropzone(state);
+
+  if (typeof config.onReady === "function") {
+    config.onReady({ state, api: ToolPage });
+  }
 
   input.addEventListener("change", () => {
     processSelectedFiles(state, Array.from(input.files || []));
@@ -421,6 +206,7 @@ function initializeToolPage() {
     const jobToken = ++state.actionToken;
     const jobSettings = { ...state.settings };
     const jobFrameSettings = state.frameSettings.map((frameSetting) => ({ ...frameSetting }));
+    const jobFileSettings = state.fileSettings.map((fileSetting) => ({ ...fileSetting }));
     state.activeJobToken = jobToken;
     state.status.textContent = "변환 중입니다. 잠시만 기다려 주세요.";
     state.convertButton.disabled = true;
@@ -430,7 +216,7 @@ function initializeToolPage() {
     setSettingsDisabled(state, true);
 
     try {
-      const results = await createResults(state.files, config, jobSettings, jobFrameSettings, jobToken, state);
+      const results = await createResults(state.files, config, jobSettings, jobFrameSettings, jobFileSettings, jobToken, state);
 
       if (!isJobActive(state, jobToken)) {
         return;
@@ -470,7 +256,7 @@ function initializeToolPage() {
     }
 
     try {
-      if (config.mode === "image") {
+      if (config.mode === "image" || config.bundleResults) {
         state.status.textContent = "ZIP 파일을 준비하고 있습니다.";
         const blob = await createZipBlob(state.results);
         downloadBlob(blob, buildBundleFileName(state.settings, panel.dataset.tool, "zip"));
@@ -493,6 +279,7 @@ function initializeToolPage() {
     state.results = [];
     state.previews = [];
     state.frameSettings = [];
+    state.fileSettings = [];
     state.dragIndex = null;
     state.pointerDrag = null;
     state.input.value = "";
@@ -507,7 +294,11 @@ function initializeToolPage() {
 }
 
 function shouldAppendFiles(config) {
-  return config.mode === "pdf" || config.mode === "pptx" || config.mode === "gif";
+  return Boolean(config.appendFiles);
+}
+
+function isDocumentImageMode(config) {
+  return config.mode === "pdf-images" || config.mode === "ppt-images";
 }
 
 function setupDropzone(state) {
@@ -593,6 +384,14 @@ function processSelectedFiles(state, nextFiles) {
     return;
   }
 
+  const invalidReason = validateFilesForConfig(nextFiles, state.config);
+
+  if (invalidReason) {
+    state.input.value = "";
+    state.status.textContent = invalidReason;
+    return;
+  }
+
   const { files: acceptedFiles, duplicateCount } = getAcceptedFiles(
     nextFiles,
     shouldAppendFiles(state.config) ? state.files : []
@@ -607,16 +406,19 @@ function processSelectedFiles(state, nextFiles) {
 
   const nextPreviews = acceptedFiles.map((file) => createPreviewRecord(file));
   const nextFrameSettings = createFrameSettings(acceptedFiles, state.settings.gifFrameDelay);
+  const nextFileSettings = createFileSettings(acceptedFiles, state);
 
   if (shouldAppendFiles(state.config)) {
     state.files = [...state.files, ...acceptedFiles];
     state.previews = [...state.previews, ...nextPreviews];
     state.frameSettings = [...state.frameSettings, ...nextFrameSettings];
+    state.fileSettings = [...state.fileSettings, ...nextFileSettings];
   } else {
     revokePreviewUrls(state.previews);
     state.files = acceptedFiles;
     state.previews = nextPreviews;
     state.frameSettings = nextFrameSettings;
+    state.fileSettings = nextFileSettings;
   }
 
   state.results = [];
@@ -674,6 +476,7 @@ function createSettingField(setting, state) {
   const field = document.createElement("label");
   field.className = "setting-field";
   field.dataset.settingType = setting.type;
+  field.dataset.settingKey = setting.key;
 
   const labelRow = document.createElement("span");
   labelRow.className = "setting-label-row";
@@ -767,11 +570,8 @@ function bindSettingInput(input, setting, state, valuePreview) {
       valuePreview.textContent = formatSettingValue(setting, nextValue);
     }
 
-    if (state.config.mode === "gif" && setting.key === "gifFrameDelay" && state.frameSettings.length > 0) {
-      state.frameSettings = state.frameSettings.map((frameSetting) => ({
-        ...frameSetting,
-        delay: frameSetting.isCustom ? frameSetting.delay : Number(nextValue),
-      }));
+    if (typeof state.config.onSettingChange === "function") {
+      state.config.onSettingChange({ state, setting, value: nextValue, api: ToolPage });
     }
 
     if (state.results.length > 0) {
@@ -814,6 +614,9 @@ function setSettingsDisabled(state, disabled) {
   state.settingsRoot?.querySelectorAll("input, select").forEach((element) => {
     element.disabled = disabled;
   });
+  state.list?.querySelectorAll("[data-file-setting-input]").forEach((element) => {
+    element.disabled = disabled;
+  });
 }
 
 function isJobActive(state, jobToken) {
@@ -839,6 +642,11 @@ function renderState(state) {
     return;
   }
 
+  if (isDocumentImageMode(state.config)) {
+    renderDocumentImageState(state);
+    return;
+  }
+
   renderQueueState(state);
 }
 
@@ -848,9 +656,12 @@ function renderImageState(state) {
     const card = document.createElement("article");
     card.className = "file-card media-card uploaded-card";
 
-    const preview = createFilePreview(state.previews[index], file.name, {
-      badgeText: String(index + 1).padStart(2, "0"),
-    });
+    const preview =
+      state.config.useResultPreviewAsFilePreview && result?.previewDataUrl
+        ? createRenderedImagePreview(result, String(index + 1).padStart(2, "0"))
+        : createFilePreview(state.previews[index], file.name, {
+            badgeText: String(index + 1).padStart(2, "0"),
+          });
 
     const meta = document.createElement("div");
     meta.className = "file-meta";
@@ -864,6 +675,14 @@ function renderImageState(state) {
       : `대기 중 · ${formatFileSize(file.size)}`;
 
     meta.append(title, info);
+
+    if (typeof state.config.createImageFileControls === "function") {
+      const controls = state.config.createImageFileControls({ state, file, index, result, api: ToolPage });
+
+      if (controls) {
+        meta.append(controls);
+      }
+    }
 
     const actions = document.createElement("div");
     actions.className = "file-actions";
@@ -884,12 +703,77 @@ function renderImageState(state) {
   });
 }
 
+function renderDocumentImageState(state) {
+  const [file] = state.files;
+
+  if (!file) {
+    return;
+  }
+
+  const sourceCard = document.createElement("article");
+  sourceCard.className = "file-card media-card uploaded-card";
+
+  const sourcePreview = createDocumentPreview(state.config.sourceLabel || "문서", "SOURCE");
+
+  const sourceMeta = document.createElement("div");
+  sourceMeta.className = "file-meta";
+
+  const sourceTitle = document.createElement("strong");
+  sourceTitle.textContent = file.name;
+
+  const sourceInfo = document.createElement("span");
+  sourceInfo.textContent =
+    state.results.length > 0
+      ? `완료 · ${state.results.length}개 이미지 생성 · ${formatFileSize(file.size)}`
+      : `대기 중 · ${formatFileSize(file.size)}`;
+
+  sourceMeta.append(sourceTitle, sourceInfo);
+
+  const sourceActions = document.createElement("div");
+  sourceActions.className = "file-actions";
+  sourceActions.append(createRemoveButton(state, 0, file.name));
+
+  sourceCard.append(sourcePreview, sourceMeta, sourceActions);
+  state.list.append(sourceCard);
+
+  state.results.forEach((result, index) => {
+    const card = document.createElement("article");
+    card.className = "file-card media-card result-image-card";
+
+    const preview = createRenderedImagePreview(result, `${state.config.resultLabel || "이미지"} ${index + 1}`);
+
+    const meta = document.createElement("div");
+    meta.className = "file-meta";
+
+    const title = document.createElement("strong");
+    title.textContent = result.fileName;
+
+    const info = document.createElement("span");
+    info.textContent = `완료 · ${formatFileSize(result.blob.size)} · ${result.width}x${result.height}`;
+
+    meta.append(title, info);
+
+    const actions = document.createElement("div");
+    actions.className = "file-actions";
+
+    const downloadButton = document.createElement("button");
+    downloadButton.type = "button";
+    downloadButton.className = "download-link";
+    downloadButton.textContent = "개별 다운로드";
+    downloadButton.addEventListener("click", () => downloadBlob(result.blob, result.fileName));
+    actions.append(downloadButton);
+
+    card.append(preview, meta, actions);
+    state.list.append(card);
+  });
+}
+
 function renderQueueState(state) {
   const isReorderable = Boolean(state.config.reorderable) && state.files.length > 1;
   state.list.classList.toggle("is-reorderable", isReorderable && state.files.length > 1);
 
-  if (state.config.mode === "gif" && state.files.length > 1) {
-    state.list.append(createGifQueueUtilityBar(state));
+  if (typeof state.config.createQueueUtilityBar === "function" && state.files.length > 1) {
+    state.list.append(state.config.createQueueUtilityBar({ state, api: ToolPage }));
   }
 
   if (isReorderable && state.files.length > 1) {
@@ -910,16 +794,18 @@ function renderQueueState(state) {
 
     const preview = createFilePreview(state.previews[index], file.name, {
       badgeText: String(index + 1).padStart(2, "0"),
-      captionText: state.config.mode === "gif" ? "FRAME" : "ORDER",
+      captionText:
+        typeof state.config.getQueueCaptionText === "function"
+          ? state.config.getQueueCaptionText({ state, file, index })
+          : "ORDER",
       deleteAction:
-        state.config.mode === "gif"
-          ? () =>
-              removeFileAtIndex(state, index, {
-                confirmMessage: `${file.name} 프레임을 삭제할까요?`,
-                successMessage: `${file.name} 프레임이 삭제되었습니다.`,
-              })
+        typeof state.config.createPreviewDeleteAction === "function"
+          ? state.config.createPreviewDeleteAction({ state, file, index, api: ToolPage })
           : null,
-      deleteLabel: `${file.name} 프레임 삭제`,
+      deleteLabel:
+        typeof state.config.getPreviewDeleteLabel === "function"
+          ? state.config.getPreviewDeleteLabel({ state, file, index })
+          : `${file.name} 삭제`,
     });
 
     const meta = document.createElement("div");
@@ -990,12 +876,12 @@ function renderQueueState(state) {
       actions.append(position);
     }
 
-    actions.append(createRemoveButton(state, index, file.name));
+    if (!state.config.hideDefaultRemoveAction) {
+      actions.append(createRemoveButton(state, index, file.name));
+    }
 
-    if (state.config.mode === "gif") {
-      actions.querySelector(".remove-file-button")?.remove();
-      actions.append(createGifDuplicateButton(state, index, file.name));
-      actions.append(createGifFrameEditor(state, index));
+    if (typeof state.config.renderAdditionalFileActions === "function") {
+      state.config.renderAdditionalFileActions({ state, file, index, actions, api: ToolPage });
     }
 
     card.append(preview, meta, actions);
@@ -1019,15 +905,13 @@ function renderQueueState(state) {
 
   const resultInfo = document.createElement("span");
   resultInfo.textContent =
-    state.config.mode === "gif"
-      ? `완료 · ${formatFileSize(result.blob.size)} · ${result.summary}`
-      : `완료 · ${formatFileSize(result.blob.size)} · ${
-          state.config.mode === "pdf" ? "PDF 문서" : "PowerPoint 문서"
-        }`;
+    typeof state.config.describeResult === "function"
+      ? state.config.describeResult({ state, result, api: ToolPage })
+      : `완료 · ${formatFileSize(result.blob.size)} · ${state.config.resultTypeLabel || "결과 파일"}`;
 
   resultMeta.append(resultTitle, resultInfo);
 
-  if (state.config.mode === "gif" && result.previewDataUrl) {
+  if (result.previewDataUrl && state.config.showResultPreview !== false) {
     const preview = document.createElement("img");
     preview.className = "result-preview";
     preview.src = result.previewDataUrl;
@@ -1041,8 +925,7 @@ function renderQueueState(state) {
   const downloadButton = document.createElement("button");
   downloadButton.type = "button";
   downloadButton.className = "download-link";
-  downloadButton.textContent =
-    state.config.mode === "pdf" ? "PDF 다운로드" : state.config.mode === "gif" ? "GIF 다운로드" : "PPTX 다운로드";
+  downloadButton.textContent = state.config.resultDownloadLabel || state.config.downloadAllLabel || "다운로드";
   downloadButton.addEventListener("click", () => downloadBlob(result.blob, result.fileName));
   resultActions.append(downloadButton);
 
@@ -1309,17 +1192,21 @@ function reorderFile(state, fromIndex, insertionIndex, options = {}) {
   const files = [...state.files];
   const previews = [...state.previews];
   const frameSettings = [...state.frameSettings];
+  const fileSettings = [...state.fileSettings];
   const [moved] = files.splice(normalizedFrom, 1);
   const [movedPreview] = previews.splice(normalizedFrom, 1);
   const [movedFrameSetting] = frameSettings.splice(normalizedFrom, 1);
+  const [movedFileSetting] = fileSettings.splice(normalizedFrom, 1);
   const targetIndex = normalizedFrom < normalizedInsertion ? normalizedInsertion - 1 : normalizedInsertion;
   files.splice(targetIndex, 0, moved);
   previews.splice(targetIndex, 0, movedPreview);
   frameSettings.splice(targetIndex, 0, movedFrameSetting);
+  fileSettings.splice(targetIndex, 0, movedFileSetting);
 
   state.files = files;
   state.previews = previews;
   state.frameSettings = frameSettings;
+  state.fileSettings = fileSettings;
   state.results = [];
   state.downloadAllButton.disabled = true;
   renderState(state);
@@ -1354,6 +1241,7 @@ function removeFileAtIndex(state, index, options = {}) {
   state.files = state.files.filter((_, fileIndex) => fileIndex !== normalizedIndex);
   state.previews = state.previews.filter((_, previewIndex) => previewIndex !== normalizedIndex);
   state.frameSettings = state.frameSettings.filter((_, frameIndex) => frameIndex !== normalizedIndex);
+  state.fileSettings = state.fileSettings.filter((_, fileSettingIndex) => fileSettingIndex !== normalizedIndex);
   state.results =
     state.config.mode === "image"
       ? state.results.filter((_, resultIndex) => resultIndex !== normalizedIndex)
@@ -1381,71 +1269,21 @@ function removeFileAtIndex(state, index, options = {}) {
       : `${removedFile.name} 파일이 제거되었습니다. 현재 ${state.files.length}개 파일이 준비되었습니다.`;
 }
 
-function duplicateGifFrameAtIndex(state, index) {
-  const normalizedIndex = Number(index);
-
-  if (!Number.isInteger(normalizedIndex) || normalizedIndex < 0 || normalizedIndex >= state.files.length) {
-    return;
+async function createResults(files, config, settings, frameSettings, fileSettings, jobToken, state) {
+  if (typeof config.createResults !== "function") {
+    throw new Error("이 페이지의 변환 스크립트를 찾지 못했습니다.");
   }
 
-  cancelActiveJob(state);
-
-  const sourceFile = state.files[normalizedIndex];
-  const sourceFrameSetting = state.frameSettings[normalizedIndex] || {
-    delay: Number(state.settings.gifFrameDelay || 180),
-    isCustom: false,
-  };
-  const insertIndex = normalizedIndex + 1;
-
-  state.files = [...state.files.slice(0, insertIndex), sourceFile, ...state.files.slice(insertIndex)];
-  state.previews = [
-    ...state.previews.slice(0, insertIndex),
-    createPreviewRecord(sourceFile),
-    ...state.previews.slice(insertIndex),
-  ];
-  state.frameSettings = [
-    ...state.frameSettings.slice(0, insertIndex),
-    { ...sourceFrameSetting },
-    ...state.frameSettings.slice(insertIndex),
-  ];
-  state.results = [];
-  state.downloadAllButton.disabled = true;
-  renderState(state);
-  state.status.textContent = `${sourceFile.name} frame duplicated at position ${insertIndex + 1}.`;
-}
-
-function reverseGifFrames(state) {
-  if (state.files.length <= 1) {
-    return;
-  }
-
-  cancelActiveJob(state);
-  state.files = [...state.files].reverse();
-  state.previews = [...state.previews].reverse();
-  state.frameSettings = [...state.frameSettings].reverse();
-  state.results = [];
-  state.dragIndex = null;
-  state.dropInsertionIndex = null;
-  state.pointerDrag = null;
-  state.downloadAllButton.disabled = true;
-  renderState(state);
-  state.status.textContent = "GIF frame order reversed.";
-}
-
-async function createResults(files, config, settings, frameSettings, jobToken, state) {
-  if (config.mode === "pdf") {
-    return [await createPdfResult(files, settings, jobToken, state)];
-  }
-
-  if (config.mode === "pptx") {
-    return [await createPptxResult(files, settings, jobToken, state)];
-  }
-
-  if (config.mode === "gif") {
-    return [await createGifResult(files, settings, frameSettings, jobToken, state)];
-  }
-
-  return createImageResults(files, config, settings, jobToken, state);
+  return config.createResults({
+    files,
+    config,
+    settings,
+    frameSettings,
+    fileSettings,
+    jobToken,
+    state,
+    api: ToolPage,
+  });
 }
 
 async function createImageResults(files, config, settings, jobToken, state) {
@@ -1478,252 +1316,6 @@ async function createImageResults(files, config, settings, jobToken, state) {
   return results;
 }
 
-async function createPdfResult(files, settings, jobToken, state) {
-  if (!window.jspdf?.jsPDF) {
-    throw new Error("jsPDF 라이브러리를 불러오지 못했습니다.");
-  }
-
-  const formatKey = settings.pdfPageSize || "a4";
-  const pageFormat = pageFormats[formatKey] || pageFormats.a4;
-  const initialOrientation = settings.pdfOrientation === "landscape" ? "landscape" : "portrait";
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({
-    unit: "pt",
-    format: pageFormat.jsPdfFormat,
-    orientation: initialOrientation,
-  });
-
-  const dpi = Number(settings.pdfDpi || 150);
-  const forcedFormat = settings.pdfImageFormat || "auto";
-  const jpegQuality = Number(settings.pdfJpegQuality || 0.92);
-  const flattenBackground = settings.pdfBackground || "#ffffff";
-
-  for (let index = 0; index < files.length; index += 1) {
-    assertJobActive(state, jobToken);
-
-    const file = files[index];
-    const image = await loadImage(file);
-    const orientation = resolvePdfOrientation(image, settings.pdfOrientation);
-
-    if (index > 0) {
-      pdf.addPage(pageFormat.jsPdfFormat, orientation);
-    } else if (orientation !== initialOrientation) {
-      pdf.deletePage(1);
-      pdf.addPage(pageFormat.jsPdfFormat, orientation);
-    }
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const fitted = fitWithinBox(image.naturalWidth, image.naturalHeight, pageWidth, pageHeight);
-    const renderWidthPx = Math.max(1, Math.round((fitted.width * dpi) / 72));
-    const renderHeightPx = Math.max(1, Math.round((fitted.height * dpi) / 72));
-    const rendered = await renderImageToBlob(image, {
-      width: renderWidthPx,
-      height: renderHeightPx,
-      format: forcedFormat === "png" ? "png" : "jpeg",
-      quality: jpegQuality,
-      backgroundColor: flattenBackground,
-      autoFormat: forcedFormat === "auto",
-    });
-
-    const offsetX = (pageWidth - fitted.width) / 2;
-    const offsetY = (pageHeight - fitted.height) / 2;
-    const dataUrl = await blobToDataUrl(rendered.blob);
-
-    assertJobActive(state, jobToken);
-    pdf.addImage(
-      dataUrl,
-      rendered.format === "png" ? "PNG" : "JPEG",
-      offsetX,
-      offsetY,
-      fitted.width,
-      fitted.height,
-      undefined,
-      "FAST"
-    );
-  }
-
-  return {
-    blob: pdf.output("blob"),
-    fileName: buildBundleFileName(settings, "images-to-pdf", "pdf"),
-  };
-}
-
-async function createPptxResult(files, settings, jobToken, state) {
-  if (!window.PptxGenJS) {
-    throw new Error("PptxGenJS 라이브러리를 불러오지 못했습니다.");
-  }
-
-  const pptx = new window.PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE";
-  pptx.author = "Tool Page";
-  pptx.company = "Tool Page";
-  pptx.subject = "Image to PowerPoint Conversion";
-  pptx.title = "Images to PPTX";
-
-  const slideWidth = 13.333;
-  const slideHeight = 7.5;
-  const margin = 0.35;
-  const labelHeight = settings.pptxFileLabel ? 0.35 : 0;
-  const usableWidth = slideWidth - margin * 2;
-  const usableHeight = slideHeight - margin * 2 - labelHeight;
-  const dpi = Number(settings.pptxDpi || 144);
-  const backgroundColor = normalizeHexColor(settings.pptxBackground || "#000000");
-
-  for (const file of files) {
-    assertJobActive(state, jobToken);
-
-    const image = await loadImage(file);
-    const slide = pptx.addSlide();
-    const placement =
-      settings.pptxFitMode === "cover"
-        ? coverWithinBox(image.naturalWidth, image.naturalHeight, usableWidth, usableHeight)
-        : fitWithinBox(image.naturalWidth, image.naturalHeight, usableWidth, usableHeight);
-    const renderWidthPx = Math.max(1, Math.round(placement.width * dpi));
-    const renderHeightPx = Math.max(1, Math.round(placement.height * dpi));
-    const rendered = await renderImageToBlob(image, {
-      width: renderWidthPx,
-      height: renderHeightPx,
-      format: "png",
-      backgroundColor: settings.pptxFitMode === "cover" ? settings.pptxBackground || "#000000" : null,
-      crop: settings.pptxFitMode === "cover",
-      cropBox: {
-        width: placement.sourceWidth,
-        height: placement.sourceHeight,
-        x: placement.sourceX,
-        y: placement.sourceY,
-      },
-    });
-    const dataUrl = await blobToDataUrl(rendered.blob);
-
-    slide.background = { color: backgroundColor };
-
-    if (settings.pptxFileLabel) {
-      slide.addText(file.name, {
-        x: margin,
-        y: slideHeight - margin - 0.15,
-        w: slideWidth - margin * 2,
-        h: labelHeight,
-        color: "FF00FF",
-        fontFace: "Aptos",
-        fontSize: 10,
-        bold: true,
-        align: "center",
-        margin: 0,
-      });
-    }
-
-    slide.addImage({
-      data: dataUrl,
-      x: (slideWidth - placement.width) / 2,
-      y: margin + (usableHeight - placement.height) / 2,
-      w: placement.width,
-      h: placement.height,
-    });
-  }
-
-  assertJobActive(state, jobToken);
-
-  return {
-    blob: await pptx.write({ outputType: "blob" }),
-    fileName: buildBundleFileName(settings, "images-to-pptx", "pptx"),
-  };
-}
-
-async function createGifResult(files, settings, frameSettings, jobToken, state) {
-  if (!window.GIF) {
-    throw new Error("GIF 라이브러리를 불러오지 못했습니다.");
-  }
-
-  const images = [];
-
-  for (const file of files) {
-    assertJobActive(state, jobToken);
-    images.push(await loadImage(file));
-  }
-
-  const canvasSize = resolveGifCanvasSize(images[0], settings.gifMaxWidth || "720");
-  const qualityProfile = getGifQualityProfile(settings.gifQualityProfile || "balanced");
-  const frameDelay = Number(settings.gifFrameDelay || 180);
-  const repeat = Number(settings.gifRepeat || 0);
-  const workerScript = await resolveGifWorkerScriptUrl();
-  const gif = new window.GIF({
-    workers: 2,
-    workerScript,
-    width: canvasSize.width,
-    height: canvasSize.height,
-    quality: qualityProfile.quality,
-    repeat,
-    background: settings.gifBackground || "#000000",
-  });
-
-  images.forEach((image, index) => {
-    assertJobActive(state, jobToken);
-    const canvas = renderImageFrameCanvas(image, {
-      width: canvasSize.width,
-      height: canvasSize.height,
-      fitMode: settings.gifFitMode || "contain",
-      backgroundColor: settings.gifBackground || "#000000",
-    });
-
-    gif.addFrame(canvas, { delay: Number(frameSettings[index]?.delay || frameDelay), copy: true });
-
-    if (isJobActive(state, jobToken)) {
-      state.status.textContent = `${index + 1}/${images.length} 프레임을 준비했습니다. GIF를 렌더링하는 중입니다.`;
-    }
-  });
-
-  const blob = await new Promise((resolve, reject) => {
-    gif.on("finished", resolve);
-    gif.on("progress", (progress) => {
-      if (isJobActive(state, jobToken)) {
-        state.status.textContent = `GIF 렌더링 중입니다. ${Math.round(progress * 100)}%`;
-      }
-    });
-    gif.on("abort", () => reject(new Error("GIF 생성이 중단되었습니다.")));
-    gif.render();
-  });
-
-  assertJobActive(state, jobToken);
-
-  return {
-    blob,
-    previewDataUrl: await blobToDataUrl(blob),
-    fileName: buildBundleFileName(settings, "images-to-gif", "gif"),
-    summary: `${files.length}프레임 · ${summarizeFrameDelays(frameSettings, frameDelay)} · ${describeLoopCount(repeat)} · ${canvasSize.width}x${canvasSize.height}`,
-  };
-}
-
-async function resolveGifWorkerScriptUrl() {
-  if (gifWorkerScriptUrlPromise) {
-    return gifWorkerScriptUrlPromise;
-  }
-
-  gifWorkerScriptUrlPromise = fetchGifWorkerScriptUrl();
-  return gifWorkerScriptUrlPromise;
-}
-
-async function fetchGifWorkerScriptUrl() {
-  try {
-    const response = await fetch(GIF_WORKER_CDN_URL, {
-      mode: "cors",
-      cache: "force-cache",
-    });
-
-    if (!response.ok) {
-      throw new Error(`GIF worker request failed with ${response.status}`);
-    }
-
-    const source = await response.text();
-    const blob = new Blob([source], { type: "text/javascript" });
-    return URL.createObjectURL(blob);
-  } catch (error) {
-    gifWorkerScriptUrlPromise = null;
-    console.error(error);
-    throw new Error("GIF worker 스크립트를 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
-  }
-}
-
 function loadImage(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -1740,6 +1332,16 @@ function loadImage(file) {
     };
 
     image.src = url;
+  });
+}
+
+function loadImageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("이미지를 렌더링하지 못했습니다."));
+    image.src = dataUrl;
   });
 }
 
@@ -1925,6 +1527,55 @@ function buildBundleFileName(settings, defaultBaseName, extension) {
   });
 }
 
+function resolvePageImageOutput(settings) {
+  const format = settings.pageImageFormat === "jpeg" || settings.pageImageFormat === "webp" ? settings.pageImageFormat : "png";
+  const outputMap = {
+    png: { extension: "png", mimeType: "image/png" },
+    jpeg: { extension: "jpg", mimeType: "image/jpeg" },
+    webp: { extension: "webp", mimeType: "image/webp" },
+  };
+
+  return {
+    format,
+    extension: outputMap[format].extension,
+    mimeType: outputMap[format].mimeType,
+    quality: Number(settings.pageImageQuality || 0.92),
+    backgroundColor: settings.pageImageBackground || "#ffffff",
+  };
+}
+
+async function createCanvasImageResult(canvas, output, settings, options) {
+  const blob = await canvasToBlob(canvas, output.mimeType, output.quality);
+
+  return {
+    blob,
+    previewDataUrl: await blobToDataUrl(blob),
+    width: canvas.width,
+    height: canvas.height,
+    fileName: buildDocumentImageFileName(settings, {
+      ...options,
+      extension: output.extension,
+    }),
+  };
+}
+
+function buildDocumentImageFileName(settings, options) {
+  const extension = String(options.extension || "png").replace(/^\./, "");
+  const prefix = sanitizeFileNameSegment(settings.outputPrefix || "");
+  const suffix = sanitizeFileNameSegment(settings.outputSuffix || "");
+  const overrideBase = sanitizeFileNameSegment(settings.outputBaseName || "");
+  const defaultBase = sanitizeFileNameSegment(options.defaultBaseName || stripExtension(options.sourceName || "") || "export");
+  const total = Math.max(1, Number(options.total || 1));
+  const startNumber = Math.max(1, Number(settings.outputStartNumber || 1));
+  const width = Math.max(2, String(startNumber + total - 1).length);
+  const number = String(startNumber + Number(options.index || 0)).padStart(width, "0");
+  const partName = sanitizeFileNameSegment(options.partName || number);
+  const baseName =
+    settings.outputNameMode === "numbered" ? `${overrideBase || defaultBase}-${number}` : `${overrideBase || defaultBase}-${partName}`;
+  const joinedBase = `${prefix}${baseName}${suffix}`.trim();
+  return `${joinedBase || "export"}.${extension}`;
+}
+
 function formatFileSize(bytes) {
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -1969,81 +1620,8 @@ function coverWithinBox(sourceWidth, sourceHeight, boxWidth, boxHeight) {
   };
 }
 
-function resolvePdfOrientation(image, setting) {
-  if (setting === "portrait" || setting === "landscape") {
-    return setting;
-  }
-
-  return image.naturalWidth > image.naturalHeight ? "landscape" : "portrait";
-}
-
 function normalizeHexColor(color) {
   return String(color).replace("#", "").toUpperCase();
-}
-
-function resolveGifCanvasSize(firstImage, maxWidthSetting) {
-  const targetWidth =
-    maxWidthSetting === "original" ? firstImage.naturalWidth : Math.min(firstImage.naturalWidth, Number(maxWidthSetting || 720));
-  const targetHeight = Math.max(1, Math.round((firstImage.naturalHeight / firstImage.naturalWidth) * targetWidth));
-
-  return {
-    width: Math.max(1, Math.round(targetWidth)),
-    height: targetHeight,
-  };
-}
-
-function getGifQualityProfile(profile) {
-  const profiles = {
-    smaller: { quality: 20 },
-    balanced: { quality: 10 },
-    sharp: { quality: 5 },
-  };
-
-  return profiles[profile] || profiles.balanced;
-}
-
-function renderImageFrameCanvas(image, options) {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Canvas context를 만들 수 없습니다.");
-  }
-
-  canvas.width = options.width;
-  canvas.height = options.height;
-  context.fillStyle = options.backgroundColor || "#000000";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (options.fitMode === "cover") {
-    const cropBox = coverWithinBox(image.naturalWidth, image.naturalHeight, canvas.width, canvas.height);
-    context.drawImage(
-      image,
-      cropBox.sourceX,
-      cropBox.sourceY,
-      cropBox.sourceWidth,
-      cropBox.sourceHeight,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-    return canvas;
-  }
-
-  const fitted = fitWithinBox(image.naturalWidth, image.naturalHeight, canvas.width, canvas.height);
-  const offsetX = (canvas.width - fitted.width) / 2;
-  const offsetY = (canvas.height - fitted.height) / 2;
-  context.drawImage(image, offsetX, offsetY, fitted.width, fitted.height);
-  return canvas;
-}
-
-function describeLoopCount(repeat) {
-  if (repeat === 0) {
-    return "무한 반복";
-  }
-
-  return `${repeat}회 재생`;
 }
 
 function createPreviewRecord(file) {
@@ -2076,6 +1654,10 @@ function getAcceptedFiles(nextFiles, existingFiles = []) {
   };
 }
 
+function validateFilesForConfig(files, config) {
+  return typeof config.validateFiles === "function" ? config.validateFiles(files) || "" : "";
+}
+
 function getFileSignature(file) {
   return [file.name, file.size, file.lastModified, file.type].join("::");
 }
@@ -2093,6 +1675,14 @@ function createFrameSettings(files, defaultDelay) {
     delay: Number(defaultDelay || 180),
     isCustom: false,
   }));
+}
+
+function createFileSettings(files, state) {
+  return files.map((file, index) =>
+    typeof state.config.createFileSettings === "function"
+      ? state.config.createFileSettings({ file, index, state, api: ToolPage }) || {}
+      : {}
+  );
 }
 
 function createFilePreview(previewRecord, fileName, options = {}) {
@@ -2158,6 +1748,54 @@ function createFilePreview(previewRecord, fileName, options = {}) {
   return frame;
 }
 
+function createDocumentPreview(label, badgeText) {
+  const frame = document.createElement("div");
+  frame.className = "file-preview-frame document-preview-frame";
+
+  const chrome = document.createElement("div");
+  chrome.className = "file-preview-chrome";
+
+  const badge = document.createElement("span");
+  badge.className = "file-preview-badge";
+  badge.textContent = badgeText;
+
+  const title = document.createElement("span");
+  title.className = "document-preview-title";
+  title.textContent = label;
+
+  chrome.append(badge);
+  frame.append(title, chrome);
+  return frame;
+}
+
+function createRenderedImagePreview(result, label) {
+  const frame = document.createElement("div");
+  frame.className = "file-preview-frame";
+
+  if (!result.previewDataUrl) {
+    frame.classList.add("is-empty");
+    return frame;
+  }
+
+  const image = document.createElement("img");
+  image.className = "file-preview-image result-preview-image";
+  image.src = result.previewDataUrl;
+  image.alt = `${label} 미리보기`;
+  image.loading = "lazy";
+  frame.append(image);
+
+  const chrome = document.createElement("div");
+  chrome.className = "file-preview-chrome";
+
+  const badge = document.createElement("span");
+  badge.className = "file-preview-badge";
+  badge.textContent = label;
+
+  chrome.append(badge);
+  frame.append(chrome);
+  return frame;
+}
+
 function createRemoveButton(state, index, fileName) {
   const button = document.createElement("button");
   button.type = "button";
@@ -2166,74 +1804,4 @@ function createRemoveButton(state, index, fileName) {
   button.setAttribute("aria-label", `${fileName} 파일 제거`);
   button.addEventListener("click", () => removeFileAtIndex(state, index));
   return button;
-}
-
-function createGifDuplicateButton(state, index, fileName) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "duplicate-file-button";
-  button.textContent = "COPY";
-  button.setAttribute("aria-label", `${fileName} frame duplicate`);
-  button.addEventListener("click", () => duplicateGifFrameAtIndex(state, index));
-  return button;
-}
-
-function createGifQueueUtilityBar(state) {
-  const toolbar = document.createElement("div");
-  toolbar.className = "queue-utility-bar";
-
-  const reverseButton = document.createElement("button");
-  reverseButton.type = "button";
-  reverseButton.className = "queue-utility-button";
-  reverseButton.textContent = "REVERSE";
-  reverseButton.addEventListener("click", () => reverseGifFrames(state));
-
-  toolbar.append(reverseButton);
-  return toolbar;
-}
-
-function createGifFrameEditor(state, index) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "frame-setting";
-
-  const label = document.createElement("span");
-  label.className = "frame-setting-label";
-  label.textContent = index === state.files.length - 1 ? "마지막 프레임 지연" : "다음 프레임 전 지연";
-
-  const input = document.createElement("input");
-  input.type = "number";
-  input.className = "frame-setting-input";
-  input.min = "60";
-  input.max = "1200";
-  input.step = "10";
-  input.value = String(state.frameSettings[index]?.delay || state.settings.gifFrameDelay || 180);
-  const commitDelay = () => {
-    const nextValue = Math.max(60, Math.min(1200, Number(input.value) || Number(state.settings.gifFrameDelay || 180)));
-    state.frameSettings[index] = {
-      delay: nextValue,
-      isCustom: true,
-    };
-    input.value = String(nextValue);
-
-    if (state.results.length > 0) {
-      state.results = [];
-      state.downloadAllButton.disabled = true;
-      state.status.textContent = "프레임 지연이 변경되었습니다. 현재 순서로 다시 생성해 주세요.";
-      renderState(state);
-    }
-  };
-  input.addEventListener("change", commitDelay);
-  input.addEventListener("blur", commitDelay);
-
-  wrapper.append(label, input);
-  return wrapper;
-}
-
-function summarizeFrameDelays(frameSettings, fallbackDelay) {
-  if (!frameSettings.length) {
-    return `${fallbackDelay}ms`;
-  }
-
-  const uniqueDelays = [...new Set(frameSettings.map((frameSetting) => Number(frameSetting.delay || fallbackDelay)))];
-  return uniqueDelays.length === 1 ? `${uniqueDelays[0]}ms` : "개별 지연";
 }

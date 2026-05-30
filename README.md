@@ -5,11 +5,12 @@
 
 ## 포함 기능
 
-- PNG to JPG
-- JPG to PNG
-- WEBP to PNG
+- Image Conveter: JPG/PNG/WEBP/SVG/TIFF 입력, JPG/PNG/WEBP 출력, 공통/파일별 형식 지정
+- Images to GIF
 - Images to PDF
 - Images to PPTX
+- PDF to Images
+- PPT to Images
 
 ## 주요 특징
 

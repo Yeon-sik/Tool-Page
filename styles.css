@@ -698,6 +698,32 @@ button:disabled {
   display: block;
 }
 
+.result-preview-image {
+  object-fit: contain;
+}
+
+.document-preview-frame {
+  display: grid;
+  place-items: center;
+}
+
+.document-preview-title {
+  position: relative;
+  z-index: 1;
+  max-width: 82%;
+  color: var(--accent-strong);
+  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.result-image-card {
+  border-color: rgba(255, 0, 255, 0.34);
+}
+
 .file-preview-chrome {
   position: absolute;
   inset: 8px 8px auto 8px;
@@ -854,6 +880,46 @@ button:disabled {
   margin-top: 6px;
   line-height: 1.45;
   font-size: 0.82rem;
+}
+
+.file-output-control {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 0, 255, 0.06);
+}
+
+.file-output-label,
+.file-output-note {
+  display: block;
+  margin: 0;
+}
+
+.file-output-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.file-output-control select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b000d;
+  color: var(--text);
+  font: inherit;
+}
+
+.file-output-note {
+  color: var(--accent-cyan);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .result-preview {
