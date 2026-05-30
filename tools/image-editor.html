@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Editor | Tool Page</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+    <script defer src="../image-editor.js"></script>
+  </head>
+  <body data-page="image-editor">
+    <div class="page-shell">
+      <header class="subpage-hero">
+        <a class="back-link" href="../index.html">메인으로 돌아가기</a>
+        <p class="eyebrow">EDITOR 08</p>
+        <h1>Image Editor</h1>
+        <p class="hero-copy">
+          이미지를 업로드한 뒤 확대와 축소로 확인하고, 회전과 자르기, 텍스트 추가, 되돌리기와 초기화까지 한 페이지에서
+          처리할 수 있습니다.
+        </p>
+      </header>
+
+      <main>
+        <section class="tool-panel image-editor-panel" data-image-editor>
+          <div class="tool-heading">
+            <p class="eyebrow">UPLOAD</p>
+            <h2>편집할 이미지 업로드</h2>
+            <p>PNG, JPG, WEBP 이미지를 불러와 바로 편집하고, 결과 이미지를 PNG로 저장할 수 있습니다.</p>
+          </div>
+
+          <div class="uploader-box image-uploader-box">
+            <label class="upload-control">
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/*" />
+              <span>이미지 파일 선택</span>
+            </label>
+            <div class="tool-actions">
+              <button type="button" data-action="undo" disabled>되돌리기</button>
+              <button type="button" data-action="reset" disabled>초기화</button>
+              <button type="button" data-action="download" disabled>PNG 저장</button>
+            </div>
+          </div>
+
+          <div class="image-dropzone" data-role="dropzone">여기로 이미지 파일을 드래그해도 됩니다.</div>
+
+          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
+            이미지를 올리면 확대, 자르기, 회전, 텍스트 추가를 바로 시작할 수 있습니다.
+          </p>
+
+          <div class="image-editor-grid">
+            <section class="image-stage">
+              <div class="image-meta">
+                <span class="tool-chip" data-role="file-name">No image loaded</span>
+                <span class="tool-chip" data-role="image-meta">0 x 0</span>
+                <span class="tool-chip" data-role="zoom-label">100%</span>
+              </div>
+
+              <div class="image-stage-toolbar">
+                <div class="image-range-group">
+                  <label for="zoom-range">확대 / 축소</label>
+                  <input id="zoom-range" type="range" min="0.5" max="3" step="0.1" value="1" data-role="zoom-range" />
+                </div>
+                <div class="tool-actions">
+                  <button type="button" data-action="zoom-out" disabled>축소</button>
+                  <button type="button" data-action="zoom-in" disabled>확대</button>
+                  <button type="button" data-action="rotate-left" disabled>왼쪽 회전</button>
+                  <button type="button" data-action="rotate-right" disabled>오른쪽 회전</button>
+                </div>
+              </div>
+
+              <div class="image-canvas-shell" data-role="canvas-shell">
+                <canvas class="image-editor-canvas" data-role="canvas"></canvas>
+                <div class="image-canvas-empty" data-role="canvas-empty">이미지를 불러오면 이곳에서 편집 내용을 확인할 수 있습니다.</div>
+              </div>
+
+              <p class="image-stage-helper">
+                확대된 상태에서는 캔버스를 드래그해 위치를 옮길 수 있습니다. 자르기 버튼을 누른 뒤 영역을 드래그해서 선택해
+                보세요.
+              </p>
+            </section>
+
+            <aside class="image-sidebar">
+              <section class="image-control-card">
+                <p class="eyebrow">TEXT</p>
+                <h3>텍스트 추가</h3>
+                <label class="image-single-field">
+                  <span>텍스트</span>
+                  <textarea data-role="text-input" rows="4" placeholder="이미지 위에 넣을 문구를 입력하세요."></textarea>
+                </label>
+                <div class="image-field-grid">
+                  <label class="image-single-field">
+                    <span>글자 색상</span>
+                    <input type="color" value="#ffffff" data-role="text-color" />
+                  </label>
+                  <label class="image-single-field">
+                    <span>글자 크기</span>
+                    <input type="number" min="12" max="160" step="2" value="42" data-role="text-size" />
+                  </label>
+                </div>
+                <button type="button" data-action="place-text" disabled>텍스트 배치 시작</button>
+                <p class="audio-helper">버튼을 누른 뒤 캔버스에서 원하는 위치를 클릭하면 텍스트가 추가됩니다.</p>
+              </section>
+
+              <section class="image-control-card">
+                <p class="eyebrow">CROP</p>
+                <h3>자르기</h3>
+                <p class="audio-helper" data-role="crop-meta">선택된 영역이 없습니다.</p>
+                <div class="tool-actions">
+                  <button type="button" data-action="start-crop" disabled>영역 선택</button>
+                  <button type="button" data-action="apply-crop" disabled>선택 영역 자르기</button>
+                  <button type="button" data-action="cancel-crop" disabled>선택 취소</button>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

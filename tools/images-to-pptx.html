@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Images to PPTX | Tool Page</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <script defer src="../app.js"></script>
+  </head>
+  <body data-page="tool" data-tool-page="images-to-pptx">
+    <div class="page-shell">
+      <header class="subpage-hero">
+        <a class="back-link" href="../index.html">허브로 돌아가기</a>
+        <p class="eyebrow">CONVERTER 06</p>
+        <h1>Images to PPTX</h1>
+        <p class="hero-copy">업로드한 이미지를 카드 순서대로 슬라이드에 배치해 PowerPoint 파일을 생성합니다.</p>
+      </header>
+
+      <main>
+        <section class="tool-panel" data-tool="images-to-pptx">
+          <div class="tool-heading">
+            <p class="eyebrow">UPLOAD</p>
+            <h2>PowerPoint로 만들 이미지 업로드</h2>
+            <p>슬라이드 순서는 드래그로 조정합니다. 현재 정렬 그대로 각 이미지가 한 장의 슬라이드에 배치됩니다.</p>
+          </div>
+
+          <div class="uploader-box">
+            <label class="upload-control">
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple />
+              <span>이미지 파일 선택</span>
+            </label>
+            <div class="tool-actions">
+              <button type="button" data-action="convert">PPTX 생성</button>
+              <button type="button" data-action="download-all" disabled>PPTX 다운로드</button>
+              <button type="button" data-action="clear">초기화</button>
+            </div>
+          </div>
+
+          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
+            이미지를 선택하면 드래그 가능한 슬라이드 순서가 표시됩니다.
+          </p>
+          <div class="file-list" data-role="list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WEBP to PNG | Tool Page</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <script defer src="../app.js"></script>
+  </head>
+  <body data-page="tool" data-tool-page="webp-to-png">
+    <div class="page-shell">
+      <header class="subpage-hero">
+        <a class="back-link" href="../index.html">허브로 돌아가기</a>
+        <p class="eyebrow">CONVERTER 03</p>
+        <h1>WEBP to PNG</h1>
+        <p class="hero-copy">WEBP 파일을 PNG로 변환해 높은 호환성을 가진 이미지로 사용할 수 있습니다.</p>
+      </header>
+
+      <main>
+        <section class="tool-panel" data-tool="webp-to-png">
+          <div class="tool-heading">
+            <p class="eyebrow">UPLOAD</p>
+            <h2>WEBP 파일 업로드</h2>
+            <p>변환 결과는 파일별 다운로드와 ZIP 다운로드로 바로 받을 수 있습니다.</p>
+          </div>
+
+          <div class="uploader-box">
+            <label class="upload-control">
+              <input type="file" accept=".webp,image/webp" multiple />
+              <span>WEBP 파일 선택</span>
+            </label>
+            <div class="tool-actions">
+              <button type="button" data-action="convert">변환 시작</button>
+              <button type="button" data-action="download-all" disabled>ZIP 다운로드</button>
+              <button type="button" data-action="clear">초기화</button>
+            </div>
+          </div>
+
+          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
+            파일을 선택하면 변환 대기 목록이 표시됩니다.
+          </p>
+          <div class="file-list" data-role="list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
