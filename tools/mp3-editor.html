@@ -63,6 +63,15 @@
 
               <div class="audio-wave-shell">
                 <canvas class="audio-wave-canvas" data-role="waveform"></canvas>
+                <div class="audio-wave-overlay" data-role="wave-overlay" aria-hidden="true">
+                  <div class="audio-wave-marker audio-wave-marker-current" data-role="playhead-marker"></div>
+                  <div class="audio-wave-marker audio-wave-marker-origin" data-role="playhead-origin-marker">
+                    <span class="audio-wave-marker-label">이전 위치</span>
+                  </div>
+                  <div class="audio-wave-marker audio-wave-marker-preview" data-role="playhead-preview-marker">
+                    <span class="audio-wave-marker-label" data-role="playhead-preview-label"></span>
+                  </div>
+                </div>
                 <div class="audio-wave-empty" data-role="wave-empty">파형을 보려면 MP3 파일을 불러오세요</div>
               </div>
 

@@ -19,7 +19,12 @@ function initializeMp3EditorPage() {
     fileMeta: panel.querySelector('[data-role="file-meta"]'),
     selectionMeta: panel.querySelector('[data-role="selection-meta"]'),
     waveform: panel.querySelector('[data-role="waveform"]'),
+    waveOverlay: panel.querySelector('[data-role="wave-overlay"]'),
     waveEmpty: panel.querySelector('[data-role="wave-empty"]'),
+    playheadMarker: panel.querySelector('[data-role="playhead-marker"]'),
+    playheadOriginMarker: panel.querySelector('[data-role="playhead-origin-marker"]'),
+    playheadPreviewMarker: panel.querySelector('[data-role="playhead-preview-marker"]'),
+    playheadPreviewLabel: panel.querySelector('[data-role="playhead-preview-label"]'),
     playheadLabel: panel.querySelector('[data-role="playhead-label"]'),
     durationLabel: panel.querySelector('[data-role="duration-label"]'),
     playButton: panel.querySelector('[data-action="play"]'),
@@ -54,7 +59,13 @@ function initializeMp3EditorPage() {
     waveformPeaks: [],
     activePlayback: null,
     animationFrame: 0,
+    dragRenderFrame: 0,
+    waveformWidth: 0,
+    waveformDragRect: null,
     dragDepth: 0,
+    playheadDragPointerId: null,
+    playheadDragOrigin: null,
+    playheadPreview: null,
     segments: [],
     nextSegmentId: 1,
     isBusy: false,
@@ -143,8 +154,8 @@ function bindAudioEditorEvents(state) {
 
     stopPlayback(state, { preservePlayhead: false });
     state.playhead = state.selectionStart;
-    updateAudioEditorUI(state);
-    renderWaveform(state);
+    updateAudioEditorUI(state, { skipSegments: true });
+    updateWaveformOverlay(state);
   });
 
   elements.setStartButton.addEventListener("click", () => {
@@ -200,30 +211,162 @@ function bindAudioEditorEvents(state) {
     addSegmentFromSelection(state);
   });
 
-  elements.waveform.addEventListener("click", (event) => {
-    if (!state.audioBuffer) {
+  elements.waveform.addEventListener("pointerdown", (event) => {
+    if (!state.audioBuffer || state.isBusy) {
       return;
     }
 
-    const rect = elements.waveform.getBoundingClientRect();
-    const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-    state.playhead = ratio * state.audioBuffer.duration;
+    event.preventDefault();
+    stopPlayback(state, { preservePlayhead: true });
+    state.waveformDragRect = getWaveformPointerRect(state);
 
-    if (event.shiftKey) {
-      setSelectionBounds(state, state.selectionStart, state.playhead);
+    if (!isPointerNearPlayhead(state, event)) {
+      movePlayheadFromPointer(state, event, {
+        updateSelection: true,
+        showPreview: false,
+        render: "immediate",
+        skipSegments: true,
+      });
+      state.waveformDragRect = null;
       return;
     }
 
-    if (event.altKey) {
-      setSelectionBounds(state, state.playhead, state.selectionEnd);
-      return;
-    }
-
-    updateAudioEditorUI(state);
-    renderWaveform(state);
+    state.playheadDragPointerId = event.pointerId;
+    state.playheadDragOrigin = state.playhead;
+    state.playheadPreview = null;
+    elements.waveform.classList.add("is-dragging");
+    elements.waveform.setPointerCapture?.(event.pointerId);
+    updateWaveformOverlay(state);
   });
 
-  window.addEventListener("resize", () => renderWaveform(state));
+  elements.waveform.addEventListener("pointermove", (event) => {
+    if (!state.audioBuffer || state.isBusy || state.playheadDragPointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    previewPlayheadFromPointer(state, event);
+  });
+
+  elements.waveform.addEventListener("pointerup", (event) => {
+    finishPlayheadDrag(state, event.pointerId, { commit: true });
+  });
+
+  elements.waveform.addEventListener("pointercancel", (event) => {
+    finishPlayheadDrag(state, event.pointerId, { commit: false });
+  });
+
+  elements.waveform.addEventListener("lostpointercapture", (event) => {
+    finishPlayheadDrag(state, event.pointerId, { commit: false });
+  });
+
+  window.addEventListener("resize", () => {
+    renderWaveform(state);
+  });
+}
+
+function movePlayheadFromPointer(state, event, options = {}) {
+  const time = getWaveformTimeFromPointer(state, event);
+
+  state.playheadPreview = null;
+  state.playhead = time;
+
+  if (options.updateSelection && event.shiftKey) {
+    setSelectionBounds(state, state.selectionStart, state.playhead, {
+      render: options.render,
+      skipSegments: options.skipSegments || options.render === "scheduled",
+    });
+    return;
+  }
+
+  if (options.updateSelection && event.altKey) {
+    setSelectionBounds(state, state.playhead, state.selectionEnd, {
+      render: options.render,
+      skipSegments: options.skipSegments || options.render === "scheduled",
+    });
+    return;
+  }
+
+  updateAudioEditorUI(state, { skipSegments: options.skipSegments });
+  updateWaveformOverlay(state);
+}
+
+function previewPlayheadFromPointer(state, event) {
+  state.playheadPreview = getWaveformTimeFromPointer(state, event);
+  scheduleDragOverlayUpdate(state);
+}
+
+function scheduleDragOverlayUpdate(state) {
+  if (state.dragRenderFrame) {
+    return;
+  }
+
+  state.dragRenderFrame = requestAnimationFrame(() => {
+    state.dragRenderFrame = 0;
+    updateWaveformOverlay(state);
+  });
+}
+
+function cancelScheduledDragOverlayUpdate(state) {
+  if (!state.dragRenderFrame) {
+    return;
+  }
+
+  cancelAnimationFrame(state.dragRenderFrame);
+  state.dragRenderFrame = 0;
+}
+
+function finishPlayheadDrag(state, pointerId, options = {}) {
+  if (state.playheadDragPointerId !== pointerId) {
+    return;
+  }
+
+  if (options.commit && Number.isFinite(state.playheadPreview)) {
+    state.playhead = state.playheadPreview;
+  }
+
+  state.playheadDragPointerId = null;
+  state.playheadDragOrigin = null;
+  state.playheadPreview = null;
+  state.waveformDragRect = null;
+  state.elements.waveform.classList.remove("is-dragging");
+  cancelScheduledDragOverlayUpdate(state);
+
+  try {
+    if (state.elements.waveform.hasPointerCapture?.(pointerId)) {
+      state.elements.waveform.releasePointerCapture?.(pointerId);
+    }
+  } catch (error) {
+    // Capture can already be gone after pointer cancellation.
+  }
+
+  updateAudioEditorUI(state, { skipSegments: true });
+  updateWaveformOverlay(state);
+}
+
+function getWaveformTimeFromPointer(state, event) {
+  const { waveform } = state.elements;
+  const rect = state.waveformDragRect || getWaveformPointerRect(state);
+  const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+
+  return ratio * state.audioBuffer.duration;
+}
+
+function isPointerNearPlayhead(state, event) {
+  const rect = state.waveformDragRect || getWaveformPointerRect(state);
+  const duration = Math.max(0.01, state.audioBuffer.duration);
+  const playheadX = rect.left + (state.playhead / duration) * rect.width;
+
+  return Math.abs(event.clientX - playheadX) <= 12;
+}
+
+function getWaveformPointerRect(state) {
+  const rect = state.elements.waveform.getBoundingClientRect();
+
+  return {
+    left: rect.left,
+    width: Math.max(1, rect.width || state.elements.waveform.clientWidth || state.waveformWidth || 1),
+  };
 }
 
 async function loadAudioFile(state, file) {
@@ -249,10 +392,15 @@ async function loadAudioFile(state, file) {
     state.selectionStart = 0;
     state.selectionEnd = decoded.duration;
     state.playhead = 0;
+    state.playheadDragPointerId = null;
+    state.playheadDragOrigin = null;
+    state.playheadPreview = null;
+    state.waveformDragRect = null;
     state.waveformPeaks = buildWaveformPeaks(decoded, 1600);
     state.segments = [];
     state.nextSegmentId = 1;
     state.elements.segmentName.value = "";
+    cancelScheduledDragOverlayUpdate(state);
 
     updateAudioEditorUI(state);
     renderWaveform(state);
@@ -274,10 +422,16 @@ function resetAudioEditor(state) {
   state.selectionStart = 0;
   state.selectionEnd = 0;
   state.playhead = 0;
+  state.playheadDragPointerId = null;
+  state.playheadDragOrigin = null;
+  state.playheadPreview = null;
+  state.waveformDragRect = null;
   state.waveformPeaks = [];
   state.segments = [];
   state.nextSegmentId = 1;
   state.elements.segmentName.value = "";
+  state.elements.waveform.classList.remove("is-dragging");
+  cancelScheduledDragOverlayUpdate(state);
   updateAudioEditorUI(state);
   renderWaveform(state);
   renderSegmentList(state);
@@ -300,7 +454,7 @@ async function ensureAudioContext(state) {
   }
 }
 
-function setSelectionBounds(state, start, end) {
+function setSelectionBounds(state, start, end, options = {}) {
   if (!state.audioBuffer) {
     return;
   }
@@ -316,7 +470,7 @@ function setSelectionBounds(state, start, end) {
   state.selectionEnd = clamp(Math.max(normalizedEnd, state.selectionStart + minimumLength), minimumLength, duration);
   state.playhead = clamp(state.playhead, state.selectionStart, state.selectionEnd);
 
-  updateAudioEditorUI(state);
+  updateAudioEditorUI(state, { skipSegments: options.skipSegments });
   renderWaveform(state);
 }
 
@@ -361,11 +515,12 @@ async function startPlayback(state, start, end, options = {}) {
     state.playhead = state.activePlayback.end;
     state.activePlayback = null;
     cancelAnimationFrame(state.animationFrame);
-    updateAudioEditorUI(state);
-    renderWaveform(state);
+    updateAudioEditorUI(state, { skipSegments: true });
+    updateWaveformOverlay(state);
   };
 
   updateAudioEditorUI(state);
+  updateWaveformOverlay(state);
   tickPlayback(state);
 }
 
@@ -391,8 +546,8 @@ function stopPlayback(state, options = {}) {
   }
 
   cancelAnimationFrame(state.animationFrame);
-  updateAudioEditorUI(state);
-  renderWaveform(state);
+  updateAudioEditorUI(state, { skipSegments: true });
+  updateWaveformOverlay(state);
 }
 
 function tickPlayback(state) {
@@ -408,7 +563,7 @@ function tickPlayback(state) {
   );
 
   updateAudioEditorUI(state, { skipSegments: true });
-  renderWaveform(state);
+  updateWaveformOverlay(state);
   state.animationFrame = requestAnimationFrame(() => tickPlayback(state));
 }
 
@@ -454,9 +609,16 @@ function renderWaveform(state) {
   const width = Math.max(320, Math.round(rect.width || waveform.clientWidth || 860));
   const height = Math.max(220, Math.round(rect.height || 280));
   const pixelRatio = window.devicePixelRatio || 1;
+  const canvasWidth = Math.round(width * pixelRatio);
+  const canvasHeight = Math.round(height * pixelRatio);
 
-  waveform.width = Math.round(width * pixelRatio);
-  waveform.height = Math.round(height * pixelRatio);
+  state.waveformWidth = width;
+
+  if (waveform.width !== canvasWidth || waveform.height !== canvasHeight) {
+    waveform.width = canvasWidth;
+    waveform.height = canvasHeight;
+  }
+
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
   context.clearRect(0, 0, width, height);
@@ -465,6 +627,7 @@ function renderWaveform(state) {
 
   if (!state.audioBuffer || state.waveformPeaks.length === 0) {
     waveEmpty.hidden = false;
+    updateWaveformOverlay(state);
     return;
   }
 
@@ -500,13 +663,43 @@ function renderWaveform(state) {
     context.fillRect(startX, height - 22, Math.max(2, endX - startX), 14);
   });
 
-  const playheadX = (state.playhead / duration) * width;
-  context.strokeStyle = "#ffffff";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(playheadX, 0);
-  context.lineTo(playheadX, height);
-  context.stroke();
+  updateWaveformOverlay(state);
+}
+
+function updateWaveformOverlay(state) {
+  const { playheadMarker, playheadOriginMarker, playheadPreviewMarker, playheadPreviewLabel } = state.elements;
+  const hasAudio = Boolean(state.audioBuffer);
+  const duration = Math.max(0.01, state.audioBuffer?.duration || 0);
+  const width = state.waveformWidth || state.elements.waveform.clientWidth || 0;
+  const isDragging = state.playheadDragPointerId !== null;
+  const showOrigin =
+    hasAudio &&
+    isDragging &&
+    Number.isFinite(state.playheadDragOrigin) &&
+    Number.isFinite(state.playheadPreview) &&
+    Math.abs(state.playheadDragOrigin - state.playheadPreview) > 0.01;
+  const showPreview = hasAudio && isDragging && Number.isFinite(state.playheadPreview);
+
+  setWaveformMarker(playheadMarker, state.playhead, duration, width, hasAudio);
+  setWaveformMarker(playheadOriginMarker, state.playheadDragOrigin, duration, width, showOrigin);
+  setWaveformMarker(playheadPreviewMarker, state.playheadPreview, duration, width, showPreview);
+
+  if (showPreview) {
+    playheadPreviewLabel.textContent = `이동 ${formatTime(state.playheadPreview)}`;
+  }
+}
+
+function setWaveformMarker(marker, time, duration, width, isVisible) {
+  if (!isVisible || !Number.isFinite(time) || width <= 0) {
+    marker.classList.remove("is-visible", "is-label-left");
+    return;
+  }
+
+  const x = clamp((time / duration) * width, 0, width);
+
+  marker.style.transform = `translate3d(${x}px, 0, 0)`;
+  marker.classList.toggle("is-label-left", x > width - 150);
+  marker.classList.add("is-visible");
 }
 
 async function exportCurrentSelection(state) {
