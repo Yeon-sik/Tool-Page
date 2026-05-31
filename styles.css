@@ -1,23 +1,85 @@
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./assets/fonts/Galmuri11_Bold.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #000000;
   --bg-soft: #080008;
   --panel: rgba(16, 0, 18, 0.9);
   --panel-strong: rgba(28, 0, 31, 0.96);
-  --surface: rgba(255, 0, 255, 0.1);
-  --surface-strong: rgba(255, 0, 255, 0.2);
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-strong: rgba(255, 0, 255, 0.18);
   --accent: #ff00ff;
   --accent-strong: #ff65ff;
-  --accent-cyan: #ff00ff;
+  --accent-cyan: #4fffea;
   --text: #fff6ff;
-  --muted: rgba(255, 246, 255, 0.72);
+  --muted: rgba(255, 246, 255, 0.78);
   --border: rgba(255, 0, 255, 0.48);
   --border-soft: rgba(255, 0, 255, 0.22);
-  --shadow: 0 0 0 1px rgba(255, 0, 255, 0.14), 0 24px 70px rgba(255, 0, 255, 0.16);
+  --shadow: 0 0 0 1px rgba(255, 0, 255, 0.12), 0 18px 48px rgba(255, 0, 255, 0.14);
   --radius: 18px;
+  --font-body: "Galmuri11", "Noto Sans KR", "Segoe UI", sans-serif;
+  --font-display: var(--font-body);
 }
 
 * {
   box-sizing: border-box;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 html {
@@ -32,7 +94,7 @@ body {
     radial-gradient(circle at 78% 16%, rgba(255, 0, 255, 0.16), transparent 22rem),
     linear-gradient(180deg, #000000 0%, #0b000d 58%, #000000 100%);
   color: var(--text);
-  font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   overflow-x: hidden;
   position: relative;
 }
@@ -56,7 +118,7 @@ body::before {
   background-size:
     12px 12px,
     24px 24px;
-  opacity: 0.38;
+  opacity: 0.24;
 }
 
 body::after {
@@ -68,11 +130,13 @@ body::after {
     transparent 5px
   );
   mix-blend-mode: screen;
-  opacity: 0.22;
+  opacity: 0.16;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -154,7 +218,7 @@ a {
   z-index: 1;
   margin: 0 0 12px;
   color: var(--accent);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.24em;
@@ -165,30 +229,32 @@ a {
 .hero h1,
 .subpage-hero h1,
 .tool-heading h2,
-.tool-card h2,
+.tool-card h3,
 .section-heading h2 {
   position: relative;
   z-index: 1;
   margin: 0;
-  line-height: 1.06;
+  font-family: var(--font-display);
+  line-height: 1.2;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .hero h1,
 .subpage-hero h1,
 .section-heading h2 {
   font-weight: 900;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .hero h1 {
   max-width: 900px;
-  font-size: clamp(1.5rem, 3.8vw, 3.1rem);
+  font-size: 3rem;
 }
 
 .subpage-hero h1 {
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
-  font-size: clamp(2.4rem, 6vw, 5.2rem);
-  letter-spacing: 0.01em;
+  font-size: 4.75rem;
+  letter-spacing: 0;
 }
 
 .hero-copy,
@@ -196,7 +262,6 @@ a {
 .tool-card p,
 .status-line,
 .section-heading p,
-.section-heading h2,
 .file-meta span,
 .queue-guide {
   color: var(--muted);
@@ -209,6 +274,8 @@ a {
   margin: 10px 0 0;
   line-height: 1.6;
   font-size: 0.92rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .hero-stats,
@@ -237,11 +304,11 @@ a {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  background: rgba(255, 0, 255, 0.1);
-  color: var(--accent-strong);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  background: rgba(255, 0, 255, 0.14);
+  color: #ffb8ff;
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -249,6 +316,10 @@ a {
   min-height: 36px;
   padding: 0 13px;
   border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .hero-nav {
@@ -258,7 +329,7 @@ a {
 }
 
 .hero-nav a,
-.tool-card a,
+.tool-card__cta,
 .back-link,
 button,
 .upload-control span,
@@ -271,6 +342,8 @@ button,
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
   text-decoration: none;
   background:
     linear-gradient(180deg, rgba(255, 0, 255, 0.16), rgba(255, 0, 255, 0.05)),
@@ -284,7 +357,7 @@ button,
 }
 
 .hero-nav a:hover,
-.tool-card a:hover,
+.tool-card__cta:hover,
 .back-link:hover,
 button:hover,
 .upload-control:hover span,
@@ -298,7 +371,7 @@ button:hover,
 }
 
 .hero-nav a:active,
-.tool-card a:active,
+.tool-card__cta:active,
 .back-link:active,
 button:active,
 .upload-control:active span,
@@ -311,7 +384,7 @@ button:active,
 }
 
 .hero-nav a:focus-visible,
-.tool-card a:focus-visible,
+.tool-card__cta:focus-visible,
 .back-link:focus-visible,
 button:focus-visible,
 .upload-control:focus-within span,
@@ -331,25 +404,47 @@ button:focus-visible,
   padding-inline: 18px;
 }
 
+.hero-nav-primary {
+  min-width: 220px;
+  border-color: rgba(255, 101, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 101, 255, 0.88), rgba(255, 0, 255, 0.76)),
+    var(--accent);
+  color: #080008;
+  font-weight: 700;
+}
+
+.hero-nav-primary:hover,
+.hero-nav-primary:focus-visible {
+  color: #080008;
+}
+
+.hero-nav-primary:active {
+  transform: translate(0, 0);
+  color: #080008;
+  box-shadow: 0 0 0 1px rgba(255, 0, 255, 0.24), 0 0 24px rgba(255, 0, 255, 0.28);
+}
+
 .section-heading {
   margin-top: 34px;
 }
 
 .section-heading h2 {
   max-width: 760px;
-  font-size: clamp(1.7rem, 4vw, 2.8rem);
+  font-size: 2.5rem;
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 18px;
   margin-top: 24px;
 }
 
 .tool-card {
-  display: grid;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 24px;
 }
 
@@ -357,7 +452,7 @@ button:focus-visible,
   position: relative;
   z-index: 1;
   color: var(--accent);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
   font-size: 2.25rem;
   font-weight: 700;
   text-shadow: 0 0 18px rgba(255, 0, 255, 0.8);
@@ -369,8 +464,15 @@ button:focus-visible,
   width: max-content;
   min-height: 28px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 0.72rem;
+  text-shadow: none;
+}
+
+.tool-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
 }
 
 .tool-card p {
@@ -378,11 +480,49 @@ button:focus-visible,
   z-index: 1;
   margin: 0;
   line-height: 1.68;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.tool-card__cta {
+  width: 100%;
+  margin-top: auto;
+  border-color: var(--border-soft);
+  color: var(--text);
+  font-weight: 700;
 }
 
 .tool-panel {
   margin-top: 24px;
   padding: clamp(22px, 4vw, 34px);
+}
+
+.direction-switcher {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.direction-switcher button {
+  min-height: 44px;
+  padding-inline: 16px;
+  border-color: rgba(255, 0, 255, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 0, 255, 0.12), rgba(255, 0, 255, 0.04)),
+    rgba(8, 0, 10, 0.92);
+  color: var(--muted);
+}
+
+.direction-switcher button.is-active {
+  border-color: rgba(255, 0, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 0, 255, 0.32), rgba(255, 0, 255, 0.12)),
+    rgba(16, 0, 18, 0.98);
+  color: var(--accent-strong);
+  box-shadow: 4px 4px 0 rgba(255, 0, 255, 0.22), 0 0 24px rgba(255, 0, 255, 0.12);
 }
 
 .tool-heading {
@@ -393,8 +533,8 @@ button:focus-visible,
 }
 
 .tool-heading h2 {
-  font-size: clamp(1.7rem, 4vw, 2.9rem);
-  letter-spacing: -0.03em;
+  font-size: 2.5rem;
+  letter-spacing: 0;
 }
 
 .tool-heading p {
@@ -427,8 +567,8 @@ button:focus-visible,
     linear-gradient(135deg, rgba(255, 0, 255, 0.12), transparent 38%),
     linear-gradient(180deg, rgba(18, 0, 20, 0.98), rgba(8, 0, 10, 0.94));
   color: var(--accent-strong);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
-  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  font-family: var(--font-display);
+  font-size: 1.18rem;
   letter-spacing: 0.04em;
   text-align: center;
   box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.08);
@@ -532,7 +672,7 @@ button:focus-visible,
 
 .setting-value {
   color: var(--accent-cyan);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
 }
 
 .setting-color-value {
@@ -698,6 +838,32 @@ button:disabled {
   display: block;
 }
 
+.result-preview-image {
+  object-fit: contain;
+}
+
+.document-preview-frame {
+  display: grid;
+  place-items: center;
+}
+
+.document-preview-title {
+  position: relative;
+  z-index: 1;
+  max-width: 82%;
+  color: var(--accent-strong);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.result-image-card {
+  border-color: rgba(255, 0, 255, 0.34);
+}
+
 .file-preview-chrome {
   position: absolute;
   inset: 8px 8px auto 8px;
@@ -726,7 +892,7 @@ button:disabled {
   background: rgba(7, 0, 9, 0.72);
   backdrop-filter: blur(8px);
   color: var(--text);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -744,7 +910,7 @@ button:disabled {
   border: 1px solid rgba(255, 0, 255, 0.48);
   background: rgba(8, 0, 10, 0.82);
   color: var(--accent-strong);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.72rem;
   line-height: 1;
   pointer-events: auto;
@@ -854,6 +1020,46 @@ button:disabled {
   margin-top: 6px;
   line-height: 1.45;
   font-size: 0.82rem;
+}
+
+.file-output-control {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 0, 255, 0.06);
+}
+
+.file-output-label,
+.file-output-note {
+  display: block;
+  margin: 0;
+}
+
+.file-output-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.file-output-control select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b000d;
+  color: var(--text);
+  font: inherit;
+}
+
+.file-output-note {
+  color: var(--accent-cyan);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .result-preview {
@@ -983,7 +1189,7 @@ button:disabled {
 
 .frame-setting-value {
   color: var(--accent-cyan);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.8rem;
 }
 
@@ -1001,6 +1207,21 @@ button:disabled {
   color: var(--text);
 }
 
+@media (max-width: 960px) {
+  .hero h1 {
+    font-size: 2.25rem;
+  }
+
+  .subpage-hero h1 {
+    font-size: 3.25rem;
+  }
+
+  .section-heading h2,
+  .tool-heading h2 {
+    font-size: 2rem;
+  }
+}
+
 @media (max-width: 760px) {
   .page-shell {
     width: min(100% - 20px, 1120px);
@@ -1011,6 +1232,19 @@ button:disabled {
   .subpage-hero,
   .tool-panel {
     padding: 22px;
+  }
+
+  .hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .subpage-hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .section-heading h2,
+  .tool-heading h2 {
+    font-size: 1.65rem;
   }
 
   .hero-nav a,
@@ -1072,8 +1306,8 @@ button:disabled {
   border-style: dashed;
   text-align: center;
   color: var(--accent-strong);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
-  font-size: clamp(1rem, 2vw, 1.24rem);
+  font-family: var(--font-display);
+  font-size: 1.12rem;
   letter-spacing: 0.05em;
 }
 
@@ -1408,8 +1642,8 @@ button:disabled {
   border-style: dashed;
   text-align: center;
   color: var(--accent-strong);
-  font-family: "Pixelify Sans", "Noto Sans KR", sans-serif;
-  font-size: clamp(1rem, 2vw, 1.24rem);
+  font-family: var(--font-display);
+  font-size: 1.12rem;
   letter-spacing: 0.05em;
 }
 
