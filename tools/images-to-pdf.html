@@ -3,53 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=./pdf.html?direction=images-to-pdf" />
     <title>Images to PDF | Tool Page</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="canonical" href="./pdf.html?direction=images-to-pdf" />
     <link rel="stylesheet" href="../styles.css" />
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script defer src="../app.js"></script>
-    <script defer src="../scripts/converter-images-to-pdf.js"></script>
+    <script>
+      window.location.replace("./pdf.html?direction=images-to-pdf");
+    </script>
   </head>
-  <body data-page="tool" data-tool-page="images-to-pdf">
+  <body data-page="tool">
     <div class="page-shell">
       <header class="subpage-hero">
         <a class="back-link" href="../index.html">허브로 돌아가기</a>
-        <p class="eyebrow">CONVERTER 05</p>
-        <h1>Images to PDF</h1>
-        <p class="hero-copy">이미지를 업로드한 뒤 카드 순서를 드래그해 하나의 PDF 문서로 묶습니다.</p>
+        <p class="eyebrow">PDF TOOLS</p>
+        <h1>PDF Tools</h1>
+        <p class="hero-copy">Images to PDF는 PDF Tools 페이지 안으로 통합되었습니다.</p>
+        <p class="hero-copy"><a href="./pdf.html?direction=images-to-pdf">PDF Tools에서 Images to PDF 열기</a></p>
       </header>
-
-      <main>
-        <section class="tool-panel" data-tool="images-to-pdf">
-          <div class="tool-heading">
-            <p class="eyebrow">UPLOAD</p>
-            <h2>PDF로 묶을 이미지 업로드</h2>
-            <p>파일 카드를 잡고 원하는 위치로 드래그하세요. 현재 목록 순서가 그대로 PDF 페이지 순서가 됩니다.</p>
-          </div>
-
-          <div class="uploader-box">
-            <label class="upload-control">
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple />
-              <span>이미지 파일 선택</span>
-            </label>
-            <div class="tool-actions">
-              <button type="button" data-action="convert">PDF 생성</button>
-              <button type="button" data-action="download-all" disabled>PDF 다운로드</button>
-              <button type="button" data-action="clear">초기화</button>
-            </div>
-          </div>
-
-          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
-            이미지를 선택하면 드래그 가능한 생성 순서가 표시됩니다.
-          </p>
-          <div class="file-list" data-role="list"></div>
-        </section>
-      </main>
     </div>
   </body>
 </html>

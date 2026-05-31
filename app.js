@@ -81,6 +81,7 @@ window.ToolPage = ToolPage;
 document.addEventListener("DOMContentLoaded", () => {
   if (document.body.dataset.page === "tool") {
     initializeToolPage();
+    setupDirectionSwitchers();
   }
 });
 
@@ -92,23 +93,25 @@ function registerTool(toolName, config) {
 }
 
 function initializeToolPage() {
-  const panel = document.querySelector("[data-tool]");
+  document.querySelectorAll("[data-tool]").forEach((panel) => initializeToolPanel(panel));
+}
 
-  if (!panel) {
-    return;
-  }
-
+function initializeToolPanel(panel) {
   const input = panel.querySelector('input[type="file"]');
   const list = panel.querySelector('[data-role="list"]');
-  const status = panel.querySelector('[data-role="status"]');
+  let status = panel.querySelector('[data-role="status"]');
   const downloadAllButton = panel.querySelector('[data-action="download-all"]');
   const convertButton = panel.querySelector('[data-action="convert"]');
   const clearButton = panel.querySelector('[data-action="clear"]');
   const uploaderBox = panel.querySelector(".uploader-box");
   const config = toolConfigs[panel.dataset.tool];
 
-  if (!config || !input || !list || !status || !downloadAllButton || !convertButton || !clearButton || !uploaderBox) {
+  if (!config || !input || !list || !downloadAllButton || !convertButton || !clearButton || !uploaderBox) {
     return;
+  }
+
+  if (!status) {
+    status = createHiddenStatusRegion(panel, list);
   }
 
   status.setAttribute("role", "status");
@@ -124,6 +127,7 @@ function initializeToolPage() {
     fileSettings: [],
     dragIndex: null,
     dropInsertionIndex: null,
+    dropMoveTargetIndex: null,
     pointerDrag: null,
     dragDepth: 0,
     dropTarget: null,
@@ -282,6 +286,7 @@ function initializeToolPage() {
     state.fileSettings = [];
     state.dragIndex = null;
     state.pointerDrag = null;
+    state.dropMoveTargetIndex = null;
     state.input.value = "";
     state.input.disabled = false;
     state.convertButton.disabled = false;
@@ -299,6 +304,54 @@ function shouldAppendFiles(config) {
 
 function isDocumentImageMode(config) {
   return config.mode === "pdf-images" || config.mode === "ppt-images";
+}
+
+function createHiddenStatusRegion(panel, list) {
+  const status = document.createElement("p");
+  status.className = "visually-hidden";
+  status.setAttribute("data-role", "status");
+  panel.insertBefore(status, list);
+  return status;
+}
+
+function setupDirectionSwitchers() {
+  document.querySelectorAll('[data-role="direction-switcher"]').forEach((switcher) => {
+    const root = switcher.closest("main") || document;
+    const buttons = Array.from(switcher.querySelectorAll("[data-direction-target]"));
+    const panels = Array.from(root.querySelectorAll("[data-direction-panel]"));
+
+    if (buttons.length === 0 || panels.length === 0) {
+      return;
+    }
+
+    const requestedDirection =
+      new URLSearchParams(window.location.search).get("direction") || window.location.hash.replace(/^#/, "");
+    const initialTarget = buttons.some((button) => button.dataset.directionTarget === requestedDirection)
+      ? requestedDirection
+      : buttons[0].dataset.directionTarget;
+
+    const activateDirection = (target, shouldUpdateUrl = false) => {
+      panels.forEach((panel) => {
+        panel.hidden = panel.dataset.directionPanel !== target;
+      });
+      buttons.forEach((button) => {
+        const isActive = button.dataset.directionTarget === target;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+      });
+
+      if (shouldUpdateUrl) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("direction", target);
+        window.history.replaceState(null, "", url);
+      }
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => activateDirection(button.dataset.directionTarget, true));
+    });
+    activateDirection(initialTarget);
+  });
 }
 
 function setupDropzone(state) {
@@ -936,6 +989,7 @@ function renderQueueState(state) {
 function startQueueDrag(event, state, index, card) {
   state.dragIndex = index;
   state.dropInsertionIndex = index;
+  state.dropMoveTargetIndex = index;
   card.classList.add("is-dragging");
 
   if (event.dataTransfer) {
@@ -950,11 +1004,7 @@ function updateQueueDropTarget(event, state, index, card) {
   }
 
   event.preventDefault();
-  const dropIndex = getInsertionIndexFromPoint(state, event.clientX, event.clientY);
-  state.dropInsertionIndex = dropIndex;
-  clearQueueDropIndicators(state);
-  showDropIndicator(state, dropIndex);
-  updateQueuePreview(state, dropIndex);
+  previewQueueMove(state, getQueueMovePlanFromPoint(state, state.dragIndex, event.clientX, event.clientY));
 
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move";
@@ -966,9 +1016,12 @@ function finishQueueDrop(event, state, index, card) {
 
   const rawIndex = event.dataTransfer?.getData("text/plain");
   const fromIndex = state.dragIndex ?? Number(rawIndex);
-  const dropIndex = state.dropInsertionIndex ?? getInsertionIndexFromPoint(state, event.clientX, event.clientY);
+  const movePlan =
+    state.dropMoveTargetIndex === null
+      ? getQueueMovePlanFromPoint(state, fromIndex, event.clientX, event.clientY)
+      : createQueueMovePlan(state.files.length, fromIndex, state.dropMoveTargetIndex);
 
-  reorderFile(state, fromIndex, dropIndex);
+  reorderFile(state, fromIndex, movePlan.targetIndex);
   endQueueDrag(state);
 }
 
@@ -981,6 +1034,7 @@ function clearQueueDropIndicators(state) {
 function endQueueDrag(state) {
   state.dragIndex = null;
   state.dropInsertionIndex = null;
+  state.dropMoveTargetIndex = null;
   resetQueuePreview(state);
   state.list.querySelectorAll(".queue-card").forEach((card) => {
     card.classList.remove("is-dragging", "drop-before", "drop-after");
@@ -990,9 +1044,9 @@ function endQueueDrag(state) {
 function handleQueueKeydown(event, state, index) {
   const movementByKey = {
     ArrowUp: index - 1,
-    ArrowDown: index + 2,
+    ArrowDown: index + 1,
     Home: 0,
-    End: state.files.length,
+    End: state.files.length - 1,
   };
 
   if (!(event.key in movementByKey)) {
@@ -1015,6 +1069,7 @@ function startPointerQueueDrag(event, state, index, card, handle) {
     handle,
   };
   state.dragIndex = index;
+  state.dropMoveTargetIndex = index;
   card.classList.add("is-dragging");
   handle.setPointerCapture?.(event.pointerId);
 }
@@ -1025,11 +1080,7 @@ function updatePointerQueueDrag(event, state) {
   }
 
   event.preventDefault();
-  const insertionIndex = getInsertionIndexFromPoint(state, event.clientX, event.clientY);
-  state.dropInsertionIndex = insertionIndex;
-  clearQueueDropIndicators(state);
-  showDropIndicator(state, insertionIndex);
-  updateQueuePreview(state, insertionIndex);
+  previewQueueMove(state, getQueueMovePlanFromPoint(state, state.pointerDrag.fromIndex, event.clientX, event.clientY));
 }
 
 function finishPointerQueueDrag(event, state) {
@@ -1039,14 +1090,17 @@ function finishPointerQueueDrag(event, state) {
 
   event.preventDefault();
   const { fromIndex, handle, pointerId } = state.pointerDrag;
-  const insertionIndex = getPointerInsertionIndex(state, event.clientY);
+  const movePlan =
+    state.dropMoveTargetIndex === null
+      ? getQueueMovePlanFromPoint(state, fromIndex, event.clientX, event.clientY)
+      : createQueueMovePlan(state.files.length, fromIndex, state.dropMoveTargetIndex);
 
   if (handle.hasPointerCapture?.(pointerId)) {
     handle.releasePointerCapture(pointerId);
   }
 
   state.pointerDrag = null;
-  reorderFile(state, fromIndex, state.dropInsertionIndex ?? insertionIndex, { focusMoved: true });
+  reorderFile(state, fromIndex, movePlan.targetIndex, { focusMoved: true });
   endQueueDrag(state);
 }
 
@@ -1055,39 +1109,74 @@ function cancelPointerQueueDrag(state) {
   endQueueDrag(state);
 }
 
-function getPointerInsertionIndex(state, clientY) {
-  const cards = Array.from(state.list.querySelectorAll(".queue-card"));
-
-  for (const card of cards) {
-    const rect = card.getBoundingClientRect();
-    const index = Number(card.dataset.index);
-
-    if (clientY < rect.top + rect.height / 2) {
-      return index;
-    }
+function showDropIndicator(state, movePlan) {
+  if (!movePlan || !movePlan.isValid || movePlan.isNoop) {
+    return;
   }
 
-  return state.files.length;
-}
-
-function showDropIndicator(state, insertionIndex) {
-  const targetIndex = Math.min(insertionIndex, state.files.length - 1);
-  const card = state.list.querySelector(`.queue-card[data-index="${targetIndex}"]`);
+  const card = state.list.querySelector(`.queue-card[data-index="${movePlan.targetIndex}"]`);
 
   if (!card) {
     return;
   }
 
-  card.classList.add(insertionIndex >= state.files.length ? "drop-after" : "drop-before");
+  card.classList.add(movePlan.targetIndex > movePlan.fromIndex ? "drop-after" : "drop-before");
 }
 
-function getInsertionIndexFromPoint(state, clientX, clientY) {
-  const cards = Array.from(state.list.querySelectorAll(".queue-card")).map((card) => ({
+function previewQueueMove(state, movePlan) {
+  const previousTargetIndex = state.dropMoveTargetIndex;
+  state.dropInsertionIndex = movePlan.insertionIndex;
+  state.dropMoveTargetIndex = movePlan.targetIndex;
+  clearQueueDropIndicators(state);
+  showDropIndicator(state, movePlan);
+  updateQueuePreview(state, movePlan.targetIndex);
+
+  if (previousTargetIndex !== movePlan.targetIndex) {
+    state.status.textContent = describeQueueMovePlan(state, movePlan);
+  }
+}
+
+function getQueueMovePlanFromPoint(state, fromIndex, clientX, clientY) {
+  const cards = getQueueCardRects(state);
+
+  if (cards.length === 0) {
+    return createQueueMovePlan(state.files.length, fromIndex, 0);
+  }
+
+  const hoveredCard = getQueueCardAtPoint(cards, clientX, clientY);
+
+  if (hoveredCard && hoveredCard.index !== Number(fromIndex)) {
+    return createQueueMovePlan(state.files.length, fromIndex, hoveredCard.index);
+  }
+
+  const insertionIndex = getInsertionIndexFromCards(cards, clientX, clientY);
+  return createQueueMovePlan(
+    state.files.length,
+    fromIndex,
+    getQueueTargetIndexFromInsertion(state.files.length, fromIndex, insertionIndex),
+    insertionIndex
+  );
+}
+
+function getQueueCardRects(state) {
+  return Array.from(state.list.querySelectorAll(".queue-card")).map((card) => ({
     card,
     index: Number(card.dataset.index),
     rect: card.getBoundingClientRect(),
   }));
+}
 
+function getQueueCardAtPoint(cards, clientX, clientY) {
+  return cards.find(
+    ({ rect }) => clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+  );
+}
+
+function getInsertionIndexFromPoint(state, clientX, clientY) {
+  return getInsertionIndexFromCards(getQueueCardRects(state), clientX, clientY);
+}
+
+function getInsertionIndexFromCards(cards, clientX, clientY) {
   if (cards.length === 0) {
     return 0;
   }
@@ -1115,36 +1204,81 @@ function getInsertionIndexFromPoint(state, clientX, clientY) {
     return nextRowCard.index;
   }
 
-  return state.files.length;
+  return cards.length;
 }
 
-function buildPreviewOrder(length, fromIndex, insertionIndex) {
-  const indexes = Array.from({ length }, (_, index) => index);
+function getQueueTargetIndexFromInsertion(length, fromIndex, insertionIndex) {
   const normalizedFrom = Number(fromIndex);
   const normalizedInsertion = Math.max(0, Math.min(Number(insertionIndex), length));
+
+  if (!Number.isInteger(normalizedFrom) || normalizedFrom < 0 || normalizedFrom >= length || length <= 0) {
+    return 0;
+  }
+
+  const targetIndex = normalizedFrom < normalizedInsertion ? normalizedInsertion - 1 : normalizedInsertion;
+  return Math.max(0, Math.min(targetIndex, length - 1));
+}
+
+function createQueueMovePlan(length, fromIndex, targetIndex, insertionIndex = null) {
+  const normalizedFrom = Number(fromIndex);
+  const normalizedTarget = Math.max(0, Math.min(Number(targetIndex), Math.max(0, length - 1)));
+
+  if (
+    length <= 0 ||
+    !Number.isInteger(normalizedFrom) ||
+    normalizedFrom < 0 ||
+    normalizedFrom >= length ||
+    !Number.isInteger(normalizedTarget)
+  ) {
+    return {
+      fromIndex: normalizedFrom,
+      targetIndex: normalizedFrom,
+      insertionIndex: normalizedFrom,
+      isValid: false,
+      isNoop: true,
+    };
+  }
+
+  return {
+    fromIndex: normalizedFrom,
+    targetIndex: normalizedTarget,
+    insertionIndex:
+      insertionIndex === null
+        ? normalizedTarget > normalizedFrom
+          ? normalizedTarget + 1
+          : normalizedTarget
+        : Math.max(0, Math.min(Number(insertionIndex), length)),
+    isValid: true,
+    isNoop: normalizedFrom === normalizedTarget,
+  };
+}
+
+function buildPreviewOrder(length, fromIndex, targetIndex) {
+  const indexes = Array.from({ length }, (_, index) => index);
+  const normalizedFrom = Number(fromIndex);
+  const normalizedTarget = Math.max(0, Math.min(Number(targetIndex), Math.max(0, length - 1)));
 
   if (
     !Number.isInteger(normalizedFrom) ||
     normalizedFrom < 0 ||
     normalizedFrom >= length ||
-    normalizedFrom === normalizedInsertion ||
-    normalizedFrom + 1 === normalizedInsertion
+    !Number.isInteger(normalizedTarget) ||
+    normalizedFrom === normalizedTarget
   ) {
     return indexes;
   }
 
   const [moved] = indexes.splice(normalizedFrom, 1);
-  const targetIndex = normalizedFrom < normalizedInsertion ? normalizedInsertion - 1 : normalizedInsertion;
-  indexes.splice(targetIndex, 0, moved);
+  indexes.splice(normalizedTarget, 0, moved);
   return indexes;
 }
 
-function updateQueuePreview(state, insertionIndex) {
+function updateQueuePreview(state, targetIndex) {
   if (state.dragIndex === null) {
     return;
   }
 
-  const previewOrder = buildPreviewOrder(state.files.length, state.dragIndex, insertionIndex);
+  const previewOrder = buildPreviewOrder(state.files.length, state.dragIndex, targetIndex);
 
   previewOrder.forEach((originalIndex, previewPosition) => {
     const card = state.list.querySelector(`.queue-card[data-index="${originalIndex}"]`);
@@ -1175,17 +1309,54 @@ function resetQueuePreview(state) {
   });
 }
 
-function reorderFile(state, fromIndex, insertionIndex, options = {}) {
-  const normalizedFrom = Number(fromIndex);
-  const normalizedInsertion = Math.max(0, Math.min(Number(insertionIndex), state.files.length));
+function describeQueueMovePlan(state, movePlan) {
+  if (!movePlan?.isValid || movePlan.isNoop) {
+    return "현재 위치입니다. 다른 카드 위로 끌면 이동될 순서가 표시됩니다.";
+  }
 
-  if (
-    !Number.isInteger(normalizedFrom) ||
-    normalizedFrom < 0 ||
-    normalizedFrom >= state.files.length ||
-    normalizedFrom === normalizedInsertion ||
-    normalizedFrom + 1 === normalizedInsertion
-  ) {
+  const moved = state.files[movePlan.fromIndex];
+  const target = state.files[movePlan.targetIndex];
+  const fromLabel = `${movePlan.fromIndex + 1}번째`;
+  const targetLabel = `${movePlan.targetIndex + 1}번째`;
+
+  if (Math.abs(movePlan.targetIndex - movePlan.fromIndex) === 1 && target) {
+    return `${moved.name} 파일은 ${fromLabel}에서 ${targetLabel}로 이동 예정입니다. ${target.name} 파일은 ${fromLabel}로 바뀝니다.`;
+  }
+
+  if (movePlan.targetIndex > movePlan.fromIndex) {
+    return `${moved.name} 파일은 ${fromLabel}에서 ${targetLabel}로 이동 예정입니다. ${movePlan.fromIndex + 2}~${
+      movePlan.targetIndex + 1
+    }번째 파일은 한 칸씩 앞으로 이동합니다.`;
+  }
+
+  return `${moved.name} 파일은 ${fromLabel}에서 ${targetLabel}로 이동 예정입니다. ${movePlan.targetIndex + 1}~${
+    movePlan.fromIndex
+  }번째 파일은 한 칸씩 뒤로 이동합니다.`;
+}
+
+function describeQueueMoveResult(moved, target, movePlan) {
+  const fromLabel = `${movePlan.fromIndex + 1}번째`;
+  const targetLabel = `${movePlan.targetIndex + 1}번째`;
+
+  if (Math.abs(movePlan.targetIndex - movePlan.fromIndex) === 1 && target) {
+    return `${moved.name} 파일이 ${fromLabel}에서 ${targetLabel}로 이동했습니다. ${target.name} 파일은 ${fromLabel}로 바뀌었습니다. 현재 순서로 다시 생성해 주세요.`;
+  }
+
+  if (movePlan.targetIndex > movePlan.fromIndex) {
+    return `${moved.name} 파일이 ${fromLabel}에서 ${targetLabel}로 이동했습니다. ${movePlan.fromIndex + 2}~${
+      movePlan.targetIndex + 1
+    }번째 파일은 한 칸씩 앞으로 이동했습니다. 현재 순서로 다시 생성해 주세요.`;
+  }
+
+  return `${moved.name} 파일이 ${fromLabel}에서 ${targetLabel}로 이동했습니다. ${movePlan.targetIndex + 1}~${
+    movePlan.fromIndex
+  }번째 파일은 한 칸씩 뒤로 이동했습니다. 현재 순서로 다시 생성해 주세요.`;
+}
+
+function reorderFile(state, fromIndex, targetIndex, options = {}) {
+  const movePlan = createQueueMovePlan(state.files.length, fromIndex, targetIndex);
+
+  if (!movePlan.isValid || movePlan.isNoop) {
     return;
   }
 
@@ -1193,15 +1364,15 @@ function reorderFile(state, fromIndex, insertionIndex, options = {}) {
   const previews = [...state.previews];
   const frameSettings = [...state.frameSettings];
   const fileSettings = [...state.fileSettings];
-  const [moved] = files.splice(normalizedFrom, 1);
-  const [movedPreview] = previews.splice(normalizedFrom, 1);
-  const [movedFrameSetting] = frameSettings.splice(normalizedFrom, 1);
-  const [movedFileSetting] = fileSettings.splice(normalizedFrom, 1);
-  const targetIndex = normalizedFrom < normalizedInsertion ? normalizedInsertion - 1 : normalizedInsertion;
-  files.splice(targetIndex, 0, moved);
-  previews.splice(targetIndex, 0, movedPreview);
-  frameSettings.splice(targetIndex, 0, movedFrameSetting);
-  fileSettings.splice(targetIndex, 0, movedFileSetting);
+  const target = files[movePlan.targetIndex];
+  const [moved] = files.splice(movePlan.fromIndex, 1);
+  const [movedPreview] = previews.splice(movePlan.fromIndex, 1);
+  const [movedFrameSetting] = frameSettings.splice(movePlan.fromIndex, 1);
+  const [movedFileSetting] = fileSettings.splice(movePlan.fromIndex, 1);
+  files.splice(movePlan.targetIndex, 0, moved);
+  previews.splice(movePlan.targetIndex, 0, movedPreview);
+  frameSettings.splice(movePlan.targetIndex, 0, movedFrameSetting);
+  fileSettings.splice(movePlan.targetIndex, 0, movedFileSetting);
 
   state.files = files;
   state.previews = previews;
@@ -1210,10 +1381,10 @@ function reorderFile(state, fromIndex, insertionIndex, options = {}) {
   state.results = [];
   state.downloadAllButton.disabled = true;
   renderState(state);
-  state.status.textContent = `${moved.name} 파일이 ${targetIndex + 1}번째로 이동했습니다. 현재 순서로 다시 생성해 주세요.`;
+  state.status.textContent = describeQueueMoveResult(moved, target, movePlan);
 
   if (options.focusMoved) {
-    state.list.querySelector(`.queue-card[data-index="${targetIndex}"] .queue-drag-handle`)?.focus({ preventScroll: true });
+    state.list.querySelector(`.queue-card[data-index="${movePlan.targetIndex}"] .queue-drag-handle`)?.focus({ preventScroll: true });
   }
 }
 
@@ -1248,6 +1419,7 @@ function removeFileAtIndex(state, index, options = {}) {
       : [];
   state.dragIndex = null;
   state.dropInsertionIndex = null;
+  state.dropMoveTargetIndex = null;
   state.pointerDrag = null;
   state.input.value = "";
   state.downloadAllButton.disabled = state.results.length === 0;

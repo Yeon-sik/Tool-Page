@@ -7,10 +7,10 @@
 
 - Image Conveter: JPG/PNG/WEBP/SVG/TIFF 입력, JPG/PNG/WEBP 출력, 공통/파일별 형식 지정
 - Images to GIF
-- Images to PDF
-- Images to PPTX
-- PDF to Images
-- PPT to Images
+- PDF Tools: Images to PDF, PDF to Images 방향 선택
+- PPT Tools: Images to PPTX, PPT to Images 방향 선택
+- MP3 Editor
+- Image Editor
 
 ## 주요 특징
 

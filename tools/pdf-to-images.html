@@ -3,54 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=./pdf.html?direction=pdf-to-images" />
     <title>PDF to Images | Tool Page</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="canonical" href="./pdf.html?direction=pdf-to-images" />
     <link rel="stylesheet" href="../styles.css" />
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script defer src="../app.js"></script>
-    <script defer src="../scripts/converter-pdf-to-images.js"></script>
+    <script>
+      window.location.replace("./pdf.html?direction=pdf-to-images");
+    </script>
   </head>
-  <body data-page="tool" data-tool-page="pdf-to-images">
+  <body data-page="tool">
     <div class="page-shell">
       <header class="subpage-hero">
         <a class="back-link" href="../index.html">허브로 돌아가기</a>
-        <p class="eyebrow">CONVERTER 07</p>
-        <h1>PDF to Images</h1>
-        <p class="hero-copy">PDF의 각 페이지를 선택한 이미지 형식으로 렌더링해 개별 파일과 ZIP으로 내보냅니다.</p>
+        <p class="eyebrow">PDF TOOLS</p>
+        <h1>PDF Tools</h1>
+        <p class="hero-copy">PDF to Images는 PDF Tools 페이지 안으로 통합되었습니다.</p>
+        <p class="hero-copy"><a href="./pdf.html?direction=pdf-to-images">PDF Tools에서 PDF to Images 열기</a></p>
       </header>
-
-      <main>
-        <section class="tool-panel" data-tool="pdf-to-images">
-          <div class="tool-heading">
-            <p class="eyebrow">UPLOAD</p>
-            <h2>이미지로 바꿀 PDF 업로드</h2>
-            <p>PNG, JPG, WEBP 중 원하는 출력 형식을 고른 뒤 PDF 페이지를 이미지 파일로 변환합니다.</p>
-          </div>
-
-          <div class="uploader-box">
-            <label class="upload-control">
-              <input type="file" accept=".pdf,application/pdf" />
-              <span>PDF 파일 선택</span>
-            </label>
-            <div class="tool-actions">
-              <button type="button" data-action="convert">이미지 생성</button>
-              <button type="button" data-action="download-all" disabled>ZIP 다운로드</button>
-              <button type="button" data-action="clear">초기화</button>
-            </div>
-          </div>
-
-          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
-            PDF를 선택하면 페이지별 이미지가 생성됩니다.
-          </p>
-          <div class="file-list" data-role="list"></div>
-        </section>
-      </main>
     </div>
   </body>
 </html>
