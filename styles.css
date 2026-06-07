@@ -604,6 +604,57 @@ button:focus-visible,
   box-shadow: 0 0 0 1px rgba(255, 0, 255, 0.2), 0 0 28px rgba(255, 0, 255, 0.14);
 }
 
+.file-sort-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(79, 255, 234, 0.24);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(79, 255, 234, 0.08), transparent 42%),
+    rgba(8, 0, 10, 0.68);
+}
+
+.file-sort-label {
+  color: var(--accent-cyan);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.file-sort-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-sort-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  border-color: rgba(79, 255, 234, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(79, 255, 234, 0.12), rgba(79, 255, 234, 0.03)),
+    rgba(0, 12, 13, 0.82);
+  color: var(--muted);
+  box-shadow: 3px 3px 0 rgba(79, 255, 234, 0.12);
+}
+
+.file-sort-button.is-active {
+  border-color: rgba(79, 255, 234, 0.82);
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(79, 255, 234, 0.28), rgba(79, 255, 234, 0.08)),
+    rgba(0, 18, 19, 0.94);
+  box-shadow: 4px 4px 0 rgba(79, 255, 234, 0.2), 0 0 20px rgba(79, 255, 234, 0.16);
+}
+
 .settings-panel {
   position: relative;
   z-index: 1;
@@ -1249,6 +1300,9 @@ button:disabled {
 
   .hero-nav a,
   .tool-actions button,
+  .file-sort-controls,
+  .file-sort-options,
+  .file-sort-button,
   .upload-control,
   .upload-control span {
     width: 100%;
