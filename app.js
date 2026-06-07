@@ -1,4 +1,10 @@
 const toolConfigs = {};
+const DEFAULT_FILE_SORT_MODE = "name-asc";
+const fileSortModes = [
+  { value: "name-asc", label: "파일 이름 오름차순" },
+  { value: "name-desc", label: "파일 이름 내림차순" },
+  { value: "random", label: "랜덤" },
+];
 
 const sharedOutputSettings = [
   {
@@ -139,14 +145,17 @@ function initializeToolPanel(panel) {
     clearButton,
     uploaderBox,
     config,
+    fileSortMode: DEFAULT_FILE_SORT_MODE,
     settings: buildDefaultSettings(config),
     settingsRoot: null,
+    sortControlsRoot: null,
     actionToken: 0,
     activeJobToken: 0,
   };
 
   state.dropTarget = ensureDropTarget(state);
   state.settingsRoot = renderSettingsPanel(panel, state);
+  state.sortControlsRoot = renderFileSortControls(panel, state);
   setupDropzone(state);
 
   if (typeof config.onReady === "function") {
@@ -314,6 +323,61 @@ function createHiddenStatusRegion(panel, list) {
   return status;
 }
 
+function renderFileSortControls(panel, state) {
+  const controls = document.createElement("div");
+  controls.className = "file-sort-controls";
+  controls.setAttribute("aria-label", "파일 정렬");
+
+  const label = document.createElement("span");
+  label.className = "file-sort-label";
+  label.textContent = "파일 정렬";
+
+  const options = document.createElement("div");
+  options.className = "file-sort-options";
+  options.setAttribute("role", "group");
+  options.setAttribute("aria-label", "파일 정렬 형식");
+
+  fileSortModes.forEach((sortMode) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "file-sort-button";
+    button.dataset.sortMode = sortMode.value;
+    button.textContent = sortMode.label;
+    button.addEventListener("click", () => setFileSortMode(state, sortMode.value));
+    options.append(button);
+  });
+
+  controls.append(label, options);
+  panel.insertBefore(controls, state.list);
+  state.sortControlsRoot = controls;
+  updateFileSortControls(state);
+  return controls;
+}
+
+function setFileSortMode(state, sortMode) {
+  state.fileSortMode = getFileSortMode(sortMode).value;
+  updateFileSortControls(state);
+
+  if (state.files.length === 0) {
+    state.status.textContent = `다음 업로드부터 ${getFileSortModeLabel(state.fileSortMode)} 형식으로 정렬됩니다.`;
+    return;
+  }
+
+  applySortedUploadRecords(state);
+  state.results = [];
+  state.downloadAllButton.disabled = true;
+  renderState(state);
+  state.status.textContent = createFileSortStatusMessage(state.fileSortMode);
+}
+
+function updateFileSortControls(state) {
+  state.sortControlsRoot?.querySelectorAll("[data-sort-mode]").forEach((button) => {
+    const isActive = button.dataset.sortMode === state.fileSortMode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
 function setupDirectionSwitchers() {
   document.querySelectorAll('[data-role="direction-switcher"]').forEach((switcher) => {
     const root = switcher.closest("main") || document;
@@ -457,30 +521,135 @@ function processSelectedFiles(state, nextFiles) {
     return;
   }
 
-  const nextPreviews = acceptedFiles.map((file) => createPreviewRecord(file));
-  const nextFrameSettings = createFrameSettings(acceptedFiles, state.settings.gifFrameDelay);
-  const nextFileSettings = createFileSettings(acceptedFiles, state);
+  const sortedAcceptedFiles = sortFilesForMode(acceptedFiles, state.fileSortMode);
+  const nextPreviews = sortedAcceptedFiles.map((file) => createPreviewRecord(file));
+  const nextFrameSettings = createFrameSettings(sortedAcceptedFiles, state.settings.gifFrameDelay);
+  const nextFileSettings = createFileSettings(sortedAcceptedFiles, state);
+  const nextUploadRecords = createUploadRecords({
+    files: sortedAcceptedFiles,
+    previews: nextPreviews,
+    frameSettings: nextFrameSettings,
+    fileSettings: nextFileSettings,
+    startIndex: shouldAppendFiles(state.config) ? state.files.length : 0,
+  });
+  const uploadRecords = sortUploadRecords(
+    shouldAppendFiles(state.config)
+      ? [
+          ...createUploadRecords({
+            files: state.files,
+            previews: state.previews,
+            frameSettings: state.frameSettings,
+            fileSettings: state.fileSettings,
+          }),
+          ...nextUploadRecords,
+        ]
+      : nextUploadRecords,
+    state.fileSortMode
+  );
 
   if (shouldAppendFiles(state.config)) {
-    state.files = [...state.files, ...acceptedFiles];
-    state.previews = [...state.previews, ...nextPreviews];
-    state.frameSettings = [...state.frameSettings, ...nextFrameSettings];
-    state.fileSettings = [...state.fileSettings, ...nextFileSettings];
+    applyUploadRecords(state, uploadRecords);
   } else {
     revokePreviewUrls(state.previews);
-    state.files = acceptedFiles;
-    state.previews = nextPreviews;
-    state.frameSettings = nextFrameSettings;
-    state.fileSettings = nextFileSettings;
+    applyUploadRecords(state, uploadRecords);
   }
 
   state.results = [];
   state.downloadAllButton.disabled = true;
   renderState(state);
   state.input.value = "";
-  state.status.textContent = `${state.files.length} file(s) ready. ${state.config.statusReady}${
-    duplicateCount > 0 ? ` Skipped ${duplicateCount} duplicate file(s).` : ""
+  state.status.textContent = `${state.files.length}개 파일이 준비되었습니다. ${state.config.statusReady} ${createFileSortStatusMessage(state.fileSortMode)}${
+    duplicateCount > 0 ? ` 중복 ${duplicateCount}개는 제외되었습니다.` : ""
   }`;
+}
+
+function createUploadRecords({ files, previews, frameSettings, fileSettings, startIndex = 0 }) {
+  return files.map((file, index) => ({
+    file,
+    preview: previews[index],
+    frameSetting: frameSettings[index],
+    fileSetting: fileSettings[index],
+    order: startIndex + index,
+  }));
+}
+
+function sortUploadRecords(records, sortMode) {
+  const normalizedSortMode = getFileSortMode(sortMode).value;
+
+  if (normalizedSortMode === "random") {
+    return shuffleRecords(records);
+  }
+
+  const direction = normalizedSortMode === "name-desc" ? -1 : 1;
+
+  return [...records].sort((left, right) => {
+    const compared = compareFileNames(left.file, right.file) * direction;
+    return compared || left.order - right.order;
+  });
+}
+
+function sortFilesForMode(files, sortMode) {
+  return sortUploadRecords(
+    createUploadRecords({
+      files,
+      previews: [],
+      frameSettings: [],
+      fileSettings: [],
+    }),
+    sortMode
+  ).map((record) => record.file);
+}
+
+function compareFileNames(left, right) {
+  return left.name.localeCompare(right.name, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function applyUploadRecords(state, records) {
+  state.files = records.map((record) => record.file);
+  state.previews = records.map((record) => record.preview);
+  state.frameSettings = records.map((record) => record.frameSetting);
+  state.fileSettings = records.map((record) => record.fileSetting);
+}
+
+function applySortedUploadRecords(state) {
+  applyUploadRecords(
+    state,
+    sortUploadRecords(
+      createUploadRecords({
+        files: state.files,
+        previews: state.previews,
+        frameSettings: state.frameSettings,
+        fileSettings: state.fileSettings,
+      }),
+      state.fileSortMode
+    )
+  );
+}
+
+function shuffleRecords(records) {
+  const shuffled = [...records];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function getFileSortMode(sortMode) {
+  return fileSortModes.find((candidate) => candidate.value === sortMode) || fileSortModes[0];
+}
+
+function getFileSortModeLabel(sortMode) {
+  return getFileSortMode(sortMode).label;
+}
+
+function createFileSortStatusMessage(sortMode) {
+  return `${getFileSortModeLabel(sortMode)} 형식으로 정렬되었습니다.`;
 }
 
 function getSettingsDefinitions(config) {
@@ -665,6 +834,9 @@ function cancelActiveJob(state) {
 
 function setSettingsDisabled(state, disabled) {
   state.settingsRoot?.querySelectorAll("input, select").forEach((element) => {
+    element.disabled = disabled;
+  });
+  state.sortControlsRoot?.querySelectorAll("button").forEach((element) => {
     element.disabled = disabled;
   });
   state.list?.querySelectorAll("[data-file-setting-input]").forEach((element) => {

@@ -1,3 +1,21 @@
+const pptxPageFormats = {
+  slide: {
+    layout: "LAYOUT_WIDE",
+    width: 13.333,
+    height: 7.5,
+  },
+  a4: {
+    layout: "LAYOUT_A4_PORTRAIT",
+    width: 8.27,
+    height: 11.69,
+  },
+  a3: {
+    layout: "LAYOUT_A3_PORTRAIT",
+    width: 11.69,
+    height: 16.54,
+  },
+};
+
 ToolPage.registerTool("images-to-pptx", {
   mode: "pptx",
   appendFiles: true,
@@ -10,6 +28,18 @@ ToolPage.registerTool("images-to-pptx", {
   resultTypeLabel: "PowerPoint 문서",
   reorderable: true,
   settings: [
+    {
+      key: "pptxPageFormat",
+      label: "슬라이드 비율",
+      description: "PPTX로 만들 슬라이드의 기본 크기와 비율을 선택합니다.",
+      type: "select",
+      defaultValue: "slide",
+      options: [
+        { value: "slide", label: "기본 슬라이드" },
+        { value: "a4", label: "A4 용지" },
+        { value: "a3", label: "A3 용지" },
+      ],
+    },
     {
       key: "pptxDpi",
       label: "슬라이드 해상도",
@@ -32,9 +62,9 @@ ToolPage.registerTool("images-to-pptx", {
     {
       key: "pptxFileLabel",
       label: "파일명 표시",
-      description: "각 슬라이드 하단에 원본 파일명을 함께 넣습니다.",
+      description: "켜면 각 슬라이드 하단 위에 원본 파일명을 겹쳐 넣습니다.",
       type: "checkbox",
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: "pptxFitMode",
@@ -57,18 +87,29 @@ async function createPptxResult(files, settings, jobToken, state, api) {
   }
 
   const pptx = new window.PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE";
+  const pageFormat = resolvePptxPageFormat(settings.pptxPageFormat);
+
+  if (pageFormat.layout !== "LAYOUT_WIDE") {
+    pptx.defineLayout({
+      name: pageFormat.layout,
+      width: pageFormat.width,
+      height: pageFormat.height,
+    });
+  }
+
+  pptx.layout = pageFormat.layout;
   pptx.author = "Tool Page";
   pptx.company = "Tool Page";
   pptx.subject = "Image to PowerPoint Conversion";
   pptx.title = "Images to PPTX";
 
-  const slideWidth = 13.333;
-  const slideHeight = 7.5;
-  const margin = 0.35;
-  const labelHeight = settings.pptxFileLabel ? 0.35 : 0;
+  const slideWidth = pageFormat.width;
+  const slideHeight = pageFormat.height;
+  const margin = 0;
+  const labelHeight = 0.28;
+  const labelInset = 0.18;
   const usableWidth = slideWidth - margin * 2;
-  const usableHeight = slideHeight - margin * 2 - labelHeight;
+  const usableHeight = slideHeight - margin * 2;
   const dpi = Number(settings.pptxDpi || 144);
   const backgroundColor = api.normalizeHexColor(settings.pptxBackground || "#000000");
 
@@ -102,13 +143,13 @@ async function createPptxResult(files, settings, jobToken, state, api) {
 
     if (settings.pptxFileLabel) {
       slide.addText(file.name, {
-        x: margin,
-        y: slideHeight - margin - 0.15,
-        w: slideWidth - margin * 2,
+        x: labelInset,
+        y: slideHeight - labelHeight - labelInset,
+        w: slideWidth - labelInset * 2,
         h: labelHeight,
         color: "FF00FF",
         fontFace: "Aptos",
-        fontSize: 10,
+        fontSize: 9,
         bold: true,
         align: "center",
         margin: 0,
@@ -130,4 +171,8 @@ async function createPptxResult(files, settings, jobToken, state, api) {
     blob: await pptx.write({ outputType: "blob" }),
     fileName: api.buildBundleFileName(settings, "images-to-pptx", "pptx"),
   };
+}
+
+function resolvePptxPageFormat(formatKey) {
+  return pptxPageFormats[formatKey] || pptxPageFormats.slide;
 }
