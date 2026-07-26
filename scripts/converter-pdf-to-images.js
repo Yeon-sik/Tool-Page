@@ -1,4 +1,7 @@
-const PDFJS_WORKER_CDN_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const PDFJS_WORKER_URL = new URL("../assets/vendor/pdf-3.11.174.worker.min.js", document.baseURI).href;
+const PDF_MAX_PAGES = 120;
+const PDF_MAX_CANVAS_DIMENSION = 16384;
+const PDF_MAX_CANVAS_PIXELS = 80_000_000;
 
 ToolPage.registerTool("pdf-to-images", {
   mode: "pdf-images",
@@ -74,7 +77,18 @@ async function createPdfImageResults(files, settings, jobToken, state, api) {
 
   const file = files[0];
   const data = new Uint8Array(await file.arrayBuffer());
-  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  const loadingTask = window.pdfjsLib.getDocument({ data });
+  api.setJobCancellation(state, jobToken, () => loadingTask.destroy());
+  const pdf = await loadingTask.promise;
+  api.assertJobActive(state, jobToken);
+
+  if (pdf.numPages > PDF_MAX_PAGES) {
+    await pdf.destroy();
+    throw new Error(
+      `이 브라우저 도구는 한 번에 최대 ${PDF_MAX_PAGES}페이지까지 변환합니다. PDF를 나눈 뒤 다시 시도해 주세요.`
+    );
+  }
+
   const scale = Math.max(0.5, Number(settings.pdfImageScale || 2));
   const output = api.resolvePageImageOutput(settings);
   const results = [];
@@ -85,6 +99,21 @@ async function createPdfImageResults(files, settings, jobToken, state, api) {
 
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale });
+    const width = Math.ceil(viewport.width);
+    const height = Math.ceil(viewport.height);
+
+    if (
+      width > PDF_MAX_CANVAS_DIMENSION ||
+      height > PDF_MAX_CANVAS_DIMENSION ||
+      width * height > PDF_MAX_CANVAS_PIXELS
+    ) {
+      page.cleanup();
+      await pdf.destroy();
+      throw new Error(
+        `${pageNumber}페이지의 렌더링 크기(${width}×${height}px)가 브라우저 안전 한도를 넘습니다. 렌더링 배율을 낮춰 주세요.`
+      );
+    }
+
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { alpha: false });
 
@@ -92,15 +121,20 @@ async function createPdfImageResults(files, settings, jobToken, state, api) {
       throw new Error("Canvas context를 만들 수 없습니다.");
     }
 
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
+    canvas.width = width;
+    canvas.height = height;
     context.fillStyle = output.backgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    await page.render({
+    const renderTask = page.render({
       canvasContext: context,
       viewport,
-    }).promise;
+    });
+    api.setJobCancellation(state, jobToken, () => {
+      renderTask.cancel();
+      void pdf.destroy();
+    });
+    await renderTask.promise;
     page.cleanup();
 
     results.push(
@@ -114,11 +148,12 @@ async function createPdfImageResults(files, settings, jobToken, state, api) {
     );
   }
 
+  await pdf.destroy();
   return results;
 }
 
 function configurePdfJs() {
   if (window.pdfjsLib?.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN_URL;
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
   }
 }

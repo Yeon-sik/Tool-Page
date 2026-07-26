@@ -3,90 +3,205 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tool Page | Pixel Utility Lab</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
-      rel="stylesheet"
+    <meta
+      name="description"
+      content="이미지, GIF, PDF, PPT, MP3 작업을 파일 업로드 없이 현재 브라우저에서 처리하는 6가지 로컬 도구 허브입니다."
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <meta name="theme-color" content="#070007" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Tool Page | 브라우저 로컬 파일 도구" />
+    <meta
+      property="og:description"
+      content="이미지, GIF, PDF, PPTX, MP3 작업을 서버 업로드 없이 현재 브라우저에서 처리합니다."
+    />
+    <meta property="og:image" content="https://yeon-sik.github.io/Tool-Page/assets/tool-page-social.png" />
+    <meta property="og:image:width" content="1733" />
+    <meta property="og:image:height" content="917" />
+    <meta property="og:image:alt" content="여섯 개의 로컬 파일 도구를 표현한 마젠타 픽셀 UI 일러스트" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; media-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'"
+    />
+    <title>로컬 도구 허브 | Tool Page</title>
+    <link rel="canonical" href="https://yeon-sik.github.io/Tool-Page/" />
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css?v=20260727c" />
   </head>
   <body data-page="home">
+    <a class="skip-link" href="#main-content">본문 바로가기</a>
+
     <div class="page-shell">
       <header class="hero">
-        <p class="eyebrow">PIXEL UTILITY LAB</p>
-        <h1>브라우저에서 바로 여는 변환기와 편집기 모음</h1>
+        <p class="eyebrow">LOCAL TOOL HUB</p>
+        <h1>브라우저 안에서 바로 끝내는 로컬 작업 도구 모음</h1>
         <p class="hero-copy">
-          설치 없이 이미지 변환, GIF 생성, PDF/PPTX 정리, 그리고 MP3 편집까지 한 곳에서 빠르게 처리할 수 있는
-          실전형 유틸리티 모음입니다.
+          이미지 변환, GIF 제작, PDF/PPT 정리, MP3 편집, 이미지 편집까지 지금 필요한 작업만 빠르게 골라 실행할 수 있습니다.
         </p>
-        <div class="hero-stats" aria-label="서비스 특징">
+        <div class="hero-stats" aria-label="홈 허브 요약">
           <span>6개 도구</span>
-          <span>브라우저 실행</span>
-          <span>설치 없음</span>
+          <span>검색 + 카테고리 필터</span>
+          <span>최근 사용 바로가기</span>
         </div>
         <nav class="hero-nav" aria-label="빠른 시작">
-          <a class="hero-nav-primary" href="#tools">도구 선택하기</a>
+          <a class="hero-nav-primary" href="#tool-finder">도구 찾기</a>
+          <a href="#tools">전체 도구 보기</a>
         </nav>
+        <div class="recent-tool-shell" id="recent-tool-shell" hidden>
+          <a class="tool-card__cta" id="recent-tool-link" href="./tools/converter.html">최근 사용 도구 다시 열기</a>
+          <p class="recent-tool-meta" id="recent-tool-meta"></p>
+        </div>
+        <div class="trust-note" aria-label="처리 방식 안내">
+          <strong>로컬 처리:</strong> 선택한 파일은 서버로 전송하지 않습니다. 필요한 라이브러리와 글꼴도 사이트에 포함되어 작업 중
+          제3자 CDN에 연결하지 않습니다.
+        </div>
       </header>
 
-      <main>
+      <main id="main-content">
+        <section class="section-heading" id="tool-finder">
+          <p class="eyebrow">FINDER</p>
+          <h2>지금 해야 하는 작업 하나만 바로 찾으세요</h2>
+          <p>검색어와 카테고리 필터로 6개 도구를 바로 좁힐 수 있습니다. 단축키는 <strong>/</strong> 검색 포커스, <strong>Esc</strong> 초기화입니다.</p>
+        </section>
+
+        <section class="tool-card home-search-panel" aria-labelledby="tool-search-title">
+          <div>
+            <span class="tool-chip">검색</span>
+            <h3 id="tool-search-title">도구 검색과 필터</h3>
+          </div>
+          <label class="home-search-label" for="tool-search-input">도구 이름, 형식, 사용 목적 검색</label>
+          <input
+            id="tool-search-input"
+            class="home-search-input"
+            type="search"
+            inputmode="search"
+            autocomplete="off"
+            placeholder="예: PDF, PNG, 영수증, 슬라이드, MP3 자르기"
+            aria-describedby="tool-search-hint results-status"
+          />
+          <div class="tool-filter-group" role="toolbar" aria-label="도구 카테고리 필터">
+            <button class="tool-filter is-active" type="button" data-filter="all" aria-pressed="true">전체</button>
+            <button class="tool-filter" type="button" data-filter="image" aria-pressed="false">이미지</button>
+            <button class="tool-filter" type="button" data-filter="document" aria-pressed="false">문서</button>
+            <button class="tool-filter" type="button" data-filter="audio" aria-pressed="false">오디오</button>
+          </div>
+          <p class="tool-search-hint" id="tool-search-hint">카드 전체를 누르는 방식은 쓰지 않았습니다. 각 카드 아래의 작업 버튼만 눌러 이동합니다.</p>
+          <p class="status-line home-results-status" id="results-status" role="status" aria-live="polite" aria-atomic="true">6개 도구를 모두 보고 있습니다.</p>
+        </section>
+
         <section class="section-heading" id="tools">
           <p class="eyebrow">TOOLS</p>
-          <h2>작업에 맞는 변환기와 편집기를 골라 바로 시작해 보세요</h2>
+          <h2>작업 성격에 맞는 도구를 골라 바로 실행하세요</h2>
         </section>
 
         <section class="card-grid" aria-label="도구 목록">
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="converter"
+            data-category="image"
+            data-purpose="포맷 호환성 정리와 묶음 이미지 변환"
+            data-keywords="이미지 변환 image converter jpg jpeg png webp svg tif tiff 포맷 호환성 썸네일 업로드 묶음 변환"
+          >
             <span class="tool-index" aria-hidden="true">01</span>
-            <span class="tool-chip">Image</span>
-            <h3>Image Converter</h3>
-            <p>JPG, PNG, WEBP, SVG, TIFF 이미지를 JPG, PNG, WEBP 중 원하는 형식으로 변환합니다.</p>
-            <a class="tool-card__cta" href="./tools/converter.html" aria-label="Image Converter 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">이미지</span>
+            <h3>이미지 형식 변환</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> JPG, PNG, WEBP, SVG, TIFF 입력 / JPG, PNG, WEBP 출력</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 업로드 전 포맷 정리, 웹 호환성 맞추기, 여러 이미지를 한 번에 변환</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/converter.html">형식 변환 시작</a>
           </article>
 
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="images-to-gif"
+            data-category="image"
+            data-purpose="이미지 시퀀스를 반복 GIF로 제작"
+            data-keywords="gif 만들기 animation png jpg jpeg webp 프레임 순서 반복 배너 짤 이미지 시퀀스"
+          >
             <span class="tool-index" aria-hidden="true">02</span>
-            <span class="tool-chip">Animation</span>
-            <h3>Images to GIF</h3>
-            <p>여러 이미지를 순서대로 묶어 GIF로 만들고, 프레임 순서와 지연 시간까지 정밀하게 조정합니다.</p>
-            <a class="tool-card__cta" href="./tools/images-to-gif.html" aria-label="Images to GIF 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">이미지</span>
+            <h3>GIF 만들기</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> PNG, JPG, WEBP 입력 / GIF 출력</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 프레임 순서 정리, 반복 재생 GIF 제작, 배너나 짧은 데모 이미지 묶기</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/images-to-gif.html">GIF 제작 열기</a>
           </article>
 
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="pdf"
+            data-category="document"
+            data-purpose="이미지와 PDF를 오가며 문서 정리"
+            data-keywords="pdf 문서 이미지 png jpg jpeg webp 영수증 스캔 견적서 pdf to images images to pdf"
+          >
             <span class="tool-index" aria-hidden="true">03</span>
-            <span class="tool-chip">Document</span>
-            <h3>PDF Tools</h3>
-            <p>이미지를 PDF 문서로 묶거나 PDF 페이지를 PNG, JPG, WEBP 이미지로 변환합니다.</p>
-            <a class="tool-card__cta" href="./tools/pdf.html" aria-label="PDF Tools 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">문서</span>
+            <h3>PDF 정리</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> PNG, JPG, WEBP ↔ PDF</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 스캔본 묶기, 영수증/견적서 정리, PDF 페이지를 이미지로 추출</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/pdf.html">PDF 작업 열기</a>
           </article>
 
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="ppt"
+            data-category="document"
+            data-purpose="슬라이드 자료와 이미지를 오가며 변환"
+            data-keywords="ppt pptx powerpoint 슬라이드 발표 자료 이미지 png jpg jpeg webp ppt to images images to pptx"
+          >
             <span class="tool-index" aria-hidden="true">04</span>
-            <span class="tool-chip">Deck</span>
-            <h3>PPT Tools</h3>
-            <p>이미지를 PowerPoint 슬라이드로 만들거나 PPTX 슬라이드를 이미지 파일로 렌더링합니다.</p>
-            <a class="tool-card__cta" href="./tools/ppt.html" aria-label="PPT Tools 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">문서</span>
+            <h3>PPT 정리</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> PNG, JPG, WEBP ↔ PPTX</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 발표용 슬라이드 생성, PPTX 페이지 추출, 이미지 자료를 슬라이드로 정리</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/ppt.html">PPT 작업 열기</a>
           </article>
 
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="mp3-editor"
+            data-category="audio"
+            data-purpose="MP3 파형 확인과 구간 편집"
+            data-keywords="mp3 오디오 편집 자르기 trim 속도 preview 구간 분할 zip export waveform"
+          >
             <span class="tool-index" aria-hidden="true">05</span>
-            <span class="tool-chip">Audio</span>
-            <h3>MP3 Editor</h3>
-            <p>MP3 파형을 보면서 자르기, 배속 미리듣기, 구간 저장과 MP3 내보내기를 한 번에 처리합니다.</p>
-            <a class="tool-card__cta" href="./tools/mp3-editor.html" aria-label="MP3 Editor 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">오디오</span>
+            <h3>MP3 편집</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> MP3 입력 / 선택 구간 MP3 또는 ZIP 출력</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 파형 확인, 시작/끝점 자르기, 여러 구간을 나눠 다시 내보내기</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/mp3-editor.html">MP3 편집 시작</a>
           </article>
 
-          <article class="tool-card">
+          <article
+            class="tool-card"
+            data-tool-card
+            data-tool-id="image-editor"
+            data-category="image"
+            data-purpose="이미지 확대와 자르기, 회전, 텍스트 추가"
+            data-keywords="image editor 이미지 편집 png jpg jpeg webp crop rotate text zoom 썸네일 시안 주석"
+          >
             <span class="tool-index" aria-hidden="true">06</span>
-            <span class="tool-chip">Editor</span>
-            <h3>Image Editor</h3>
-            <p>확대와 축소로 이미지를 살펴보고, 자르기와 회전, 텍스트 추가까지 브라우저에서 바로 편집합니다.</p>
-            <a class="tool-card__cta" href="./tools/image-editor.html" aria-label="Image Editor 페이지 열기">페이지 열기</a>
+            <span class="tool-chip">이미지</span>
+            <h3>이미지 편집</h3>
+            <p class="support-copy"><strong>지원 형식:</strong> PNG, JPG, WEBP 입력 / PNG, JPG, WEBP 출력</p>
+            <p class="support-copy"><strong>사용 목적:</strong> 확대 확인, 자르기, 회전, 텍스트 주석 추가, 빠른 시안 수정</p>
+            <a class="tool-card__cta" data-tool-link href="./tools/image-editor.html">이미지 편집 시작</a>
           </article>
         </section>
+
+        <article class="tool-card empty-state" id="empty-state" hidden>
+          <span class="tool-chip">검색 결과 없음</span>
+          <h3>조건에 맞는 도구가 없습니다</h3>
+          <p class="support-copy">검색어를 줄이거나 카테고리를 <strong>전체</strong>로 바꿔 다시 확인하세요.</p>
+          <button type="button" data-reset-filters>검색 초기화</button>
+        </article>
       </main>
     </div>
+
+    <script defer src="./scripts/home.js?v=20260727c"></script>
   </body>
 </html>

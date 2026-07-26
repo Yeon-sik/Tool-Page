@@ -1,0 +1,21 @@
+{
+  "name": "tool-page",
+  "version": "1.0.0",
+  "private": true,
+  "description": "브라우저에서 파일을 로컬 처리하는 정적 유틸리티 허브",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-sites.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "npm run test:static && npm run test:deploy && npm run test:e2e",
+    "test:static": "node scripts/validate-site.mjs",
+    "test:deploy": "npm run build && node --test tests/sites-worker.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:webkit": "playwright test --project=webkit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.0"
+  }
+}

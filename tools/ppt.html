@@ -3,21 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PPT Tools | Tool Page</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
-      rel="stylesheet"
+    <meta name="description" content="이미지를 PPTX로 묶거나 기본 요소 중심의 PPTX 슬라이드를 이미지로 변환합니다." />
+    <meta name="theme-color" content="#070007" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; media-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'"
     />
-    <link rel="stylesheet" href="../styles.css" />
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-    <script defer src="../app.js"></script>
-    <script defer src="../scripts/converter-images-to-pptx.js"></script>
-    <script defer src="../scripts/converter-ppt-to-images.js"></script>
+    <title>PPT 정리 | Tool Page</title>
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../styles.css?v=20260727c" />
+    <script defer src="../assets/vendor/jszip-3.10.1.min.js"></script>
+    <script defer src="../assets/vendor/pptxgenjs-3.12.0.bundle.js"></script>
+    <script defer src="../app.js?v=20260727c"></script>
+    <script defer src="../scripts/converter-images-to-pptx.js?v=20260727c"></script>
+    <script defer src="../scripts/converter-ppt-to-images.js?v=20260727c"></script>
   </head>
   <body data-page="tool" data-tool-page="ppt">
+    <a class="skip-link" href="#main-content">본문 바로가기</a>
     <div class="page-shell">
       <header class="subpage-hero">
         <a class="back-link" href="../index.html">허브로 돌아가기</a>
@@ -26,18 +29,26 @@
         <p class="hero-copy">이미지를 PowerPoint 슬라이드로 만들거나 PPTX 슬라이드를 이미지로 변환하는 방향을 선택합니다.</p>
       </header>
 
-      <main>
+      <main id="main-content">
         <div class="direction-switcher" data-role="direction-switcher" aria-label="PPT 변환 방향">
-          <button type="button" data-direction-target="images-to-pptx" aria-pressed="true">Images to PPTX</button>
-          <button type="button" data-direction-target="ppt-to-images" aria-pressed="false">PPT to Images</button>
+          <button type="button" data-direction-target="images-to-pptx" aria-controls="images-to-pptx-panel" aria-pressed="true">
+            이미지 → PPTX
+          </button>
+          <button type="button" data-direction-target="ppt-to-images" aria-controls="ppt-to-images-panel" aria-pressed="false">
+            PPTX → 이미지
+          </button>
         </div>
 
-        <section class="tool-panel" data-tool="images-to-pptx" data-direction-panel="images-to-pptx">
+        <section id="images-to-pptx-panel" class="tool-panel" data-tool="images-to-pptx" data-direction-panel="images-to-pptx">
           <div class="tool-heading">
             <p class="eyebrow">UPLOAD</p>
             <h2>PowerPoint로 만들 이미지 업로드</h2>
             <p>슬라이드 순서는 드래그로 조정합니다. 현재 정렬 그대로 각 이미지가 한 장의 슬라이드에 배치됩니다.</p>
           </div>
+          <p class="local-processing-note">
+            <strong>처리 방식:</strong> 파일 내용은 서버로 업로드하지 않고 현재 브라우저에서 PPTX로 묶습니다. PPTX 생성 라이브러리도
+            사이트에 포함되어 있습니다.
+          </p>
 
           <div class="uploader-box">
             <label class="upload-control">
@@ -53,12 +64,20 @@
           <div class="file-list" data-role="list"></div>
         </section>
 
-        <section class="tool-panel" data-tool="ppt-to-images" data-direction-panel="ppt-to-images" hidden>
+        <section id="ppt-to-images-panel" class="tool-panel" data-tool="ppt-to-images" data-direction-panel="ppt-to-images" hidden>
           <div class="tool-heading">
             <p class="eyebrow">UPLOAD</p>
             <h2>이미지로 바꿀 PowerPoint 업로드</h2>
-            <p>PPTX 슬라이드를 PNG, JPG, WEBP 이미지로 변환합니다. 구형 PPT는 PPTX로 저장한 뒤 사용해 주세요.</p>
+            <p>
+              브라우저 렌더러가 지원하는 텍스트, 기본 도형, 이미지 중심의 PPTX를 PNG, JPG, WEBP로 변환합니다. 표, 차트,
+              SmartArt, 연결선, 미디어 등 미지원 요소가 있으면 누락 대신 변환을 중단합니다.
+            </p>
           </div>
+          <p class="local-processing-note">
+            <strong>제한 사항:</strong> PowerPoint와 동일한 렌더링이 아닙니다. 중요한 문서는 결과 이미지를 반드시 확인하세요. 파일 내용은
+            서버로 업로드하지 않으며 PPTX 해석과 ZIP 생성 라이브러리도 사이트에 포함되어 있습니다. 한 번에 최대 100슬라이드까지
+            변환합니다.
+          </p>
 
           <div class="uploader-box">
             <label class="upload-control">

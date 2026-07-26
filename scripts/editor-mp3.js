@@ -1,3 +1,8 @@
+const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024;
+const MIN_SELECTION_SECONDS = 0.05;
+const WAVEFORM_STEP_SECONDS = 1;
+const WAVEFORM_FAST_STEP_SECONDS = 5;
+
 document.addEventListener("DOMContentLoaded", () => {
   if (document.body.dataset.page === "mp3-editor") {
     initializeMp3EditorPage();
@@ -12,6 +17,7 @@ function initializeMp3EditorPage() {
   }
 
   const elements = {
+    panel,
     input: panel.querySelector('input[type="file"]'),
     dropzone: panel.querySelector('[data-role="dropzone"]'),
     status: panel.querySelector('[data-role="status"]'),
@@ -69,12 +75,15 @@ function initializeMp3EditorPage() {
     segments: [],
     nextSegmentId: 1,
     isBusy: false,
+    busyTarget: null,
     elements,
   };
 
   bindAudioEditorEvents(state);
   updateAudioEditorUI(state);
   renderWaveform(state);
+  renderSegmentList(state);
+  announceRuntimeRequirements(state);
 }
 
 function bindAudioEditorEvents(state) {
@@ -84,8 +93,21 @@ function bindAudioEditorEvents(state) {
     void loadAudioFile(state, Array.from(elements.input.files || [])[0] || null);
   });
 
+  elements.dropzone.addEventListener("click", () => {
+    openFilePicker(state);
+  });
+
+  elements.dropzone.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openFilePicker(state);
+  });
+
   elements.dropzone.addEventListener("dragenter", (event) => {
-    if (!hasDraggedFiles(event)) {
+    if (state.isBusy || !hasDraggedFiles(event)) {
       return;
     }
 
@@ -95,7 +117,7 @@ function bindAudioEditorEvents(state) {
   });
 
   elements.dropzone.addEventListener("dragover", (event) => {
-    if (!hasDraggedFiles(event)) {
+    if (state.isBusy || !hasDraggedFiles(event)) {
       return;
     }
 
@@ -118,7 +140,7 @@ function bindAudioEditorEvents(state) {
   });
 
   elements.dropzone.addEventListener("drop", (event) => {
-    if (!hasDraggedFiles(event)) {
+    if (state.isBusy || !hasDraggedFiles(event)) {
       return;
     }
 
@@ -128,23 +150,8 @@ function bindAudioEditorEvents(state) {
     void loadAudioFile(state, Array.from(event.dataTransfer?.files || [])[0] || null);
   });
 
-  elements.playButton.addEventListener("click", async () => {
-    if (!state.audioBuffer || state.isBusy) {
-      return;
-    }
-
-    if (state.activePlayback) {
-      stopPlayback(state, { preservePlayhead: true });
-      return;
-    }
-
-    const playbackStart = clamp(
-      state.playhead < state.selectionStart || state.playhead >= state.selectionEnd ? state.selectionStart : state.playhead,
-      state.selectionStart,
-      Math.max(state.selectionStart, state.selectionEnd - 0.05)
-    );
-
-    await startPlayback(state, playbackStart, state.selectionEnd, { allowLoop: true });
+  elements.playButton.addEventListener("click", () => {
+    void togglePlayback(state);
   });
 
   elements.stopButton.addEventListener("click", () => {
@@ -153,9 +160,7 @@ function bindAudioEditorEvents(state) {
     }
 
     stopPlayback(state, { preservePlayhead: false });
-    state.playhead = state.selectionStart;
-    updateAudioEditorUI(state, { skipSegments: true });
-    updateWaveformOverlay(state);
+    setPlayhead(state, state.selectionStart, { skipSegments: true });
   });
 
   elements.setStartButton.addEventListener("click", () => {
@@ -192,7 +197,8 @@ function bindAudioEditorEvents(state) {
 
   elements.playbackRate.addEventListener("change", () => {
     state.playbackRate = Number(elements.playbackRate.value || 1);
-    setStatus(state, `배속이 ${state.playbackRate.toFixed(2)}x 로 변경되었습니다.`);
+    setStatus(state, `배속을 ${state.playbackRate.toFixed(2)}x로 변경했습니다.`, { tone: "info" });
+    updateAudioEditorUI(state);
   });
 
   elements.exportSelection.addEventListener("click", () => {
@@ -211,6 +217,10 @@ function bindAudioEditorEvents(state) {
     addSegmentFromSelection(state);
   });
 
+  elements.waveform.addEventListener("keydown", (event) => {
+    void handleWaveformKeydown(state, event);
+  });
+
   elements.waveform.addEventListener("pointerdown", (event) => {
     if (!state.audioBuffer || state.isBusy) {
       return;
@@ -223,8 +233,6 @@ function bindAudioEditorEvents(state) {
     if (!isPointerNearPlayhead(state, event)) {
       movePlayheadFromPointer(state, event, {
         updateSelection: true,
-        showPreview: false,
-        render: "immediate",
         skipSegments: true,
       });
       state.waveformDragRect = null;
@@ -265,30 +273,119 @@ function bindAudioEditorEvents(state) {
   });
 }
 
+function announceRuntimeRequirements(state) {
+  const missing = [];
+
+  if (!window.lamejs) {
+    missing.push("MP3 저장 라이브러리");
+  }
+
+  if (!window.JSZip) {
+    missing.push("ZIP 라이브러리");
+  }
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  setStatus(
+    state,
+    `오디오 편집은 로컬에서 계속 사용할 수 있지만 사이트에 포함된 ${missing.join(", ")}를 읽지 못했습니다. 페이지를 새로고침하거나 배포 파일을 확인해 주세요.`,
+    { tone: "warning" }
+  );
+}
+
+function openFilePicker(state) {
+  if (state.isBusy) {
+    return;
+  }
+
+  state.elements.input.click();
+}
+
+async function handleWaveformKeydown(state, event) {
+  if (!state.audioBuffer || state.isBusy) {
+    return;
+  }
+
+  const duration = state.audioBuffer.duration;
+  const step = event.shiftKey ? WAVEFORM_FAST_STEP_SECONDS : WAVEFORM_STEP_SECONDS;
+
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    stopPlayback(state, { preservePlayhead: true });
+    setPlayhead(state, state.playhead - step, { skipSegments: true });
+    return;
+  }
+
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    stopPlayback(state, { preservePlayhead: true });
+    setPlayhead(state, state.playhead + step, { skipSegments: true });
+    return;
+  }
+
+  if (event.key === "Home") {
+    event.preventDefault();
+    stopPlayback(state, { preservePlayhead: true });
+    setPlayhead(state, 0, { skipSegments: true });
+    return;
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    stopPlayback(state, { preservePlayhead: true });
+    setPlayhead(state, duration, { skipSegments: true });
+    return;
+  }
+
+  if (event.key === " " || event.key === "Spacebar") {
+    event.preventDefault();
+    await togglePlayback(state);
+  }
+}
+
+async function togglePlayback(state) {
+  if (!state.audioBuffer || state.isBusy) {
+    return;
+  }
+
+  if (state.activePlayback) {
+    stopPlayback(state, { preservePlayhead: true });
+    return;
+  }
+
+  const playbackStart = clamp(
+    state.playhead < state.selectionStart || state.playhead >= state.selectionEnd ? state.selectionStart : state.playhead,
+    state.selectionStart,
+    Math.max(state.selectionStart, state.selectionEnd - MIN_SELECTION_SECONDS)
+  );
+
+  await startPlayback(state, playbackStart, state.selectionEnd, { allowLoop: true });
+}
+
 function movePlayheadFromPointer(state, event, options = {}) {
   const time = getWaveformTimeFromPointer(state, event);
 
   state.playheadPreview = null;
-  state.playhead = time;
 
   if (options.updateSelection && event.shiftKey) {
+    state.playhead = time;
     setSelectionBounds(state, state.selectionStart, state.playhead, {
-      render: options.render,
-      skipSegments: options.skipSegments || options.render === "scheduled",
+      skipSegments: options.skipSegments,
     });
     return;
   }
 
   if (options.updateSelection && event.altKey) {
+    state.playhead = time;
     setSelectionBounds(state, state.playhead, state.selectionEnd, {
-      render: options.render,
-      skipSegments: options.skipSegments || options.render === "scheduled",
+      skipSegments: options.skipSegments,
     });
     return;
   }
 
-  updateAudioEditorUI(state, { skipSegments: options.skipSegments });
-  updateWaveformOverlay(state);
+  setPlayhead(state, time, { skipSegments: options.skipSegments });
 }
 
 function previewPlayheadFromPointer(state, event) {
@@ -322,7 +419,7 @@ function finishPlayheadDrag(state, pointerId, options = {}) {
   }
 
   if (options.commit && Number.isFinite(state.playheadPreview)) {
-    state.playhead = state.playheadPreview;
+    state.playhead = clamp(state.playheadPreview, 0, state.audioBuffer?.duration || 0);
   }
 
   state.playheadDragPointerId = null;
@@ -337,7 +434,7 @@ function finishPlayheadDrag(state, pointerId, options = {}) {
       state.elements.waveform.releasePointerCapture?.(pointerId);
     }
   } catch (error) {
-    // Capture can already be gone after pointer cancellation.
+    console.error(error);
   }
 
   updateAudioEditorUI(state, { skipSegments: true });
@@ -345,16 +442,15 @@ function finishPlayheadDrag(state, pointerId, options = {}) {
 }
 
 function getWaveformTimeFromPointer(state, event) {
-  const { waveform } = state.elements;
   const rect = state.waveformDragRect || getWaveformPointerRect(state);
   const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
 
-  return ratio * state.audioBuffer.duration;
+  return ratio * (state.audioBuffer?.duration || 0);
 }
 
 function isPointerNearPlayhead(state, event) {
   const rect = state.waveformDragRect || getWaveformPointerRect(state);
-  const duration = Math.max(0.01, state.audioBuffer.duration);
+  const duration = Math.max(0.01, state.audioBuffer?.duration || 0);
   const playheadX = rect.left + (state.playhead / duration) * rect.width;
 
   return Math.abs(event.clientX - playheadX) <= 12;
@@ -370,17 +466,30 @@ function getWaveformPointerRect(state) {
 }
 
 async function loadAudioFile(state, file) {
-  if (!file) {
+  if (!file || state.isBusy) {
     return;
   }
 
-  if (!file.type.startsWith("audio/") && !file.name.toLowerCase().endsWith(".mp3")) {
-    setStatus(state, "오디오 파일만 업로드할 수 있습니다.");
+  if (!isSupportedAudioFile(file)) {
+    setStatus(state, "지원하지 않는 파일입니다. 확장자와 형식이 MP3인 파일만 열 수 있습니다.", { tone: "error" });
+    return;
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    setStatus(
+      state,
+      `파일 크기가 ${formatBytes(file.size)}입니다. MP3 편집기는 150 MB 이하 파일만 열 수 있습니다.`,
+      { tone: "error" }
+    );
     return;
   }
 
   try {
-    setBusy(state, true, "오디오를 불러오고 파형을 준비하는 중입니다...");
+    setBusy(state, true, {
+      message: "오디오 파일을 불러오고 파형을 준비하는 중입니다...",
+      target: "load-file",
+      tone: "info",
+    });
     stopPlayback(state, { preservePlayhead: false });
     await ensureAudioContext(state);
 
@@ -405,10 +514,19 @@ async function loadAudioFile(state, file) {
     updateAudioEditorUI(state);
     renderWaveform(state);
     renderSegmentList(state);
-    setStatus(state, `${file.name} 파일을 불러왔습니다. 선택 구간을 조정하거나 세그먼트를 추가해 보세요.`);
+
+    const availabilityNote = window.lamejs
+      ? "선택 구간을 조정하거나 세그먼트를 추가해 보세요."
+      : "파형 확인과 미리 듣기는 가능하지만, MP3 저장용 라이브러리를 불러오지 못해 내보내기는 비활성화됩니다.";
+
+    setStatus(state, `${file.name} 파일을 불러왔습니다. ${availabilityNote}`, { tone: "success" });
   } catch (error) {
     console.error(error);
-    setStatus(state, "오디오 파일을 읽지 못했습니다. 다른 MP3 파일로 다시 시도해 주세요.");
+    setStatus(state, interpretLoadError(error), { tone: "error" });
+    resetLoadedAudioState(state);
+    updateAudioEditorUI(state);
+    renderWaveform(state);
+    renderSegmentList(state);
   } finally {
     setBusy(state, false);
     state.elements.input.value = "";
@@ -417,6 +535,16 @@ async function loadAudioFile(state, file) {
 
 function resetAudioEditor(state) {
   stopPlayback(state, { preservePlayhead: false });
+  resetLoadedAudioState(state);
+  cancelScheduledDragOverlayUpdate(state);
+  state.elements.waveform.classList.remove("is-dragging");
+  updateAudioEditorUI(state);
+  renderWaveform(state);
+  renderSegmentList(state);
+  setStatus(state, "MP3 편집기를 초기화했습니다.", { tone: "info" });
+}
+
+function resetLoadedAudioState(state) {
   state.audioBuffer = null;
   state.file = null;
   state.selectionStart = 0;
@@ -430,12 +558,6 @@ function resetAudioEditor(state) {
   state.segments = [];
   state.nextSegmentId = 1;
   state.elements.segmentName.value = "";
-  state.elements.waveform.classList.remove("is-dragging");
-  cancelScheduledDragOverlayUpdate(state);
-  updateAudioEditorUI(state);
-  renderWaveform(state);
-  renderSegmentList(state);
-  setStatus(state, "MP3 편집기가 초기화되었습니다.");
 }
 
 async function ensureAudioContext(state) {
@@ -443,7 +565,7 @@ async function ensureAudioContext(state) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
     if (!AudioContextClass) {
-      throw new Error("AudioContext not supported");
+      throw new Error("AUDIO_CONTEXT_UNSUPPORTED");
     }
 
     state.audioContext = new AudioContextClass();
@@ -464,14 +586,26 @@ function setSelectionBounds(state, start, end, options = {}) {
   const safeEnd = clamp(Number.isFinite(end) ? end : state.selectionEnd, 0, duration);
   const normalizedStart = Math.min(safeStart, safeEnd);
   const normalizedEnd = Math.max(safeStart, safeEnd);
-  const minimumLength = 0.05;
 
-  state.selectionStart = clamp(normalizedStart, 0, Math.max(0, duration - minimumLength));
-  state.selectionEnd = clamp(Math.max(normalizedEnd, state.selectionStart + minimumLength), minimumLength, duration);
+  state.selectionStart = clamp(normalizedStart, 0, Math.max(0, duration - MIN_SELECTION_SECONDS));
+  state.selectionEnd = clamp(
+    Math.max(normalizedEnd, state.selectionStart + MIN_SELECTION_SECONDS),
+    MIN_SELECTION_SECONDS,
+    duration
+  );
   state.playhead = clamp(state.playhead, state.selectionStart, state.selectionEnd);
 
   updateAudioEditorUI(state, { skipSegments: options.skipSegments });
   renderWaveform(state);
+}
+
+function setPlayhead(state, time, options = {}) {
+  const duration = state.audioBuffer?.duration || 0;
+
+  state.playheadPreview = null;
+  state.playhead = clamp(Number(time) || 0, 0, duration);
+  updateAudioEditorUI(state, { skipSegments: options.skipSegments });
+  updateWaveformOverlay(state);
 }
 
 async function startPlayback(state, start, end, options = {}) {
@@ -487,7 +621,7 @@ async function startPlayback(state, start, end, options = {}) {
   source.playbackRate.value = state.playbackRate;
   source.connect(state.audioContext.destination);
 
-  const rawDuration = Math.max(0.05, end - start);
+  const rawDuration = Math.max(MIN_SELECTION_SECONDS, end - start);
   const playedDuration = rawDuration / state.playbackRate;
   const startedAt = state.audioContext.currentTime;
 
@@ -499,6 +633,7 @@ async function startPlayback(state, start, end, options = {}) {
     startedAt,
     start,
     end,
+    rate: state.playbackRate,
     allowLoop: Boolean(options.allowLoop),
   };
 
@@ -519,7 +654,7 @@ async function startPlayback(state, start, end, options = {}) {
     updateWaveformOverlay(state);
   };
 
-  updateAudioEditorUI(state);
+  updateAudioEditorUI(state, { skipSegments: true });
   updateWaveformOverlay(state);
   tickPlayback(state);
 }
@@ -535,7 +670,7 @@ function stopPlayback(state, options = {}) {
 
   if (options.preservePlayhead) {
     const elapsed = (state.audioContext?.currentTime || playback.startedAt) - playback.startedAt;
-    state.playhead = clamp(playback.start + elapsed * state.playbackRate, playback.start, playback.end);
+    state.playhead = clamp(playback.start + elapsed * playback.rate, playback.start, playback.end);
   }
 
   try {
@@ -557,7 +692,7 @@ function tickPlayback(state) {
 
   const elapsed = state.audioContext.currentTime - state.activePlayback.startedAt;
   state.playhead = clamp(
-    state.activePlayback.start + elapsed * state.playbackRate,
+    state.activePlayback.start + elapsed * state.activePlayback.rate,
     state.activePlayback.start,
     state.activePlayback.end
   );
@@ -569,9 +704,14 @@ function tickPlayback(state) {
 
 function buildWaveformPeaks(audioBuffer, buckets) {
   const channelCount = audioBuffer.numberOfChannels;
+  const channelData = [];
   const length = audioBuffer.length;
   const bucketSize = Math.max(1, Math.floor(length / buckets));
   const peaks = [];
+
+  for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
+    channelData.push(audioBuffer.getChannelData(channelIndex));
+  }
 
   for (let bucketIndex = 0; bucketIndex < buckets; bucketIndex += 1) {
     const start = bucketIndex * bucketSize;
@@ -583,7 +723,7 @@ function buildWaveformPeaks(audioBuffer, buckets) {
       let mixed = 0;
 
       for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
-        mixed += audioBuffer.getChannelData(channelIndex)[sampleIndex] || 0;
+        mixed += channelData[channelIndex][sampleIndex] || 0;
       }
 
       mixed /= channelCount;
@@ -620,7 +760,6 @@ function renderWaveform(state) {
   }
 
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#050005";
   context.fillRect(0, 0, width, height);
@@ -686,6 +825,8 @@ function updateWaveformOverlay(state) {
 
   if (showPreview) {
     playheadPreviewLabel.textContent = `이동 ${formatTime(state.playheadPreview)}`;
+  } else {
+    playheadPreviewLabel.textContent = "";
   }
 }
 
@@ -707,15 +848,24 @@ async function exportCurrentSelection(state) {
     return;
   }
 
+  if (!window.lamejs) {
+    setStatus(state, "사이트에 포함된 MP3 저장 라이브러리를 읽지 못했습니다. 새로고침하거나 배포 파일을 확인해 주세요.", { tone: "error" });
+    return;
+  }
+
   try {
-    setBusy(state, true, "선택 구간을 MP3로 내보내는 중입니다...");
+    setBusy(state, true, {
+      message: "선택 구간을 MP3로 저장하는 중입니다...",
+      target: "export-selection",
+      tone: "info",
+    });
     const rendered = await renderEditedBuffer(state, state.selectionStart, state.selectionEnd, state.playbackRate);
     const blob = await audioBufferToMp3Blob(rendered);
     downloadBlob(blob, buildAudioFileName(state, "selection"));
-    setStatus(state, "선택 구간 MP3 저장이 완료되었습니다.");
+    setStatus(state, "선택 구간 MP3 저장이 완료되었습니다.", { tone: "success" });
   } catch (error) {
     console.error(error);
-    setStatus(state, "선택 구간 MP3 저장에 실패했습니다.");
+    setStatus(state, "선택 구간 MP3 저장에 실패했습니다. 브라우저 메모리와 파일 상태를 확인해 주세요.", { tone: "error" });
   } finally {
     setBusy(state, false);
   }
@@ -727,16 +877,25 @@ async function exportAllSegmentsZip(state) {
   }
 
   if (!window.JSZip) {
-    setStatus(state, "ZIP 라이브러리를 불러오지 못했습니다.");
+    setStatus(state, "사이트에 포함된 ZIP 라이브러리를 읽지 못했습니다. 새로고침하거나 배포 파일을 확인해 주세요.", { tone: "error" });
+    return;
+  }
+
+  if (!window.lamejs) {
+    setStatus(state, "사이트에 포함된 MP3 저장 라이브러리를 읽지 못했습니다. 새로고침하거나 배포 파일을 확인해 주세요.", { tone: "error" });
     return;
   }
 
   try {
-    setBusy(state, true, "세그먼트를 MP3로 변환해 ZIP으로 묶는 중입니다...");
+    setBusy(state, true, {
+      message: "세그먼트를 MP3로 변환해 ZIP으로 묶는 중입니다...",
+      target: "export-zip",
+      tone: "info",
+    });
     const zip = new window.JSZip();
 
     for (const [index, segment] of state.segments.entries()) {
-      setStatus(state, `${index + 1}/${state.segments.length} 세그먼트를 변환하는 중입니다...`);
+      setStatus(state, `${index + 1}/${state.segments.length} 세그먼트를 변환하는 중입니다...`, { tone: "info" });
       const rendered = await renderEditedBuffer(state, segment.start, segment.end, state.playbackRate);
       const blob = await audioBufferToMp3Blob(rendered);
       zip.file(`${sanitizeSegmentName(segment.name, index + 1)}.mp3`, blob);
@@ -744,10 +903,10 @@ async function exportAllSegmentsZip(state) {
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
     downloadBlob(zipBlob, `${baseAudioName(state.file)}-segments.zip`);
-    setStatus(state, "세그먼트 ZIP 저장이 완료되었습니다.");
+    setStatus(state, "세그먼트 ZIP 저장이 완료되었습니다.", { tone: "success" });
   } catch (error) {
     console.error(error);
-    setStatus(state, "세그먼트 ZIP 저장에 실패했습니다.");
+    setStatus(state, "세그먼트 ZIP 저장에 실패했습니다. 브라우저 메모리와 파일 상태를 확인해 주세요.", { tone: "error" });
   } finally {
     setBusy(state, false);
   }
@@ -760,15 +919,24 @@ async function exportSingleSegment(state, segmentId) {
     return;
   }
 
+  if (!window.lamejs) {
+    setStatus(state, "사이트에 포함된 MP3 저장 라이브러리를 읽지 못했습니다. 새로고침하거나 배포 파일을 확인해 주세요.", { tone: "error" });
+    return;
+  }
+
   try {
-    setBusy(state, true, `${segment.name} 구간을 MP3로 내보내는 중입니다...`);
+    setBusy(state, true, {
+      message: `${segment.name} 구간을 MP3로 저장하는 중입니다...`,
+      target: `segment-export-${segment.id}`,
+      tone: "info",
+    });
     const rendered = await renderEditedBuffer(state, segment.start, segment.end, state.playbackRate);
     const blob = await audioBufferToMp3Blob(rendered);
     downloadBlob(blob, `${sanitizeSegmentName(segment.name)}.mp3`);
-    setStatus(state, `${segment.name} MP3 저장이 완료되었습니다.`);
+    setStatus(state, `${segment.name} MP3 저장이 완료되었습니다.`, { tone: "success" });
   } catch (error) {
     console.error(error);
-    setStatus(state, `${segment.name} MP3 저장에 실패했습니다.`);
+    setStatus(state, `${segment.name} MP3 저장에 실패했습니다.`, { tone: "error" });
   } finally {
     setBusy(state, false);
   }
@@ -777,11 +945,17 @@ async function exportSingleSegment(state, segmentId) {
 async function renderEditedBuffer(state, start, end, rate) {
   await ensureAudioContext(state);
 
-  const sourceDuration = Math.max(0.05, end - start);
+  const sourceDuration = Math.max(MIN_SELECTION_SECONDS, end - start);
   const outputDuration = sourceDuration / rate;
   const sampleRate = state.audioBuffer.sampleRate;
   const channels = Math.min(2, state.audioBuffer.numberOfChannels);
-  const offlineContext = new OfflineAudioContext(channels, Math.ceil(sampleRate * outputDuration), sampleRate);
+  const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+
+  if (!OfflineContext) {
+    throw new Error("OFFLINE_AUDIO_CONTEXT_UNSUPPORTED");
+  }
+
+  const offlineContext = new OfflineContext(channels, Math.ceil(sampleRate * outputDuration), sampleRate);
   const source = offlineContext.createBufferSource();
 
   source.buffer = state.audioBuffer;
@@ -794,7 +968,7 @@ async function renderEditedBuffer(state, start, end, rate) {
 
 async function audioBufferToMp3Blob(audioBuffer) {
   if (!window.lamejs) {
-    throw new Error("lamejs not available");
+    throw new Error("LAME_NOT_AVAILABLE");
   }
 
   const channels = Math.min(2, audioBuffer.numberOfChannels);
@@ -843,8 +1017,8 @@ function addSegmentFromSelection(state) {
   const start = roundTime(state.selectionStart);
   const end = roundTime(state.selectionEnd);
 
-  if (end - start < 0.05) {
-    setStatus(state, "세그먼트로 저장할 구간이 너무 짧습니다.");
+  if (end - start < MIN_SELECTION_SECONDS) {
+    setStatus(state, "세그먼트로 저장할 구간이 너무 짧습니다.", { tone: "error" });
     return;
   }
 
@@ -863,21 +1037,25 @@ function addSegmentFromSelection(state) {
   renderSegmentList(state);
   renderWaveform(state);
   updateAudioEditorUI(state);
-  setStatus(state, `${name} 구간이 저장되었습니다.`);
+  setStatus(state, `${name} 구간을 저장했습니다.`, { tone: "success" });
 }
 
 function updateSegment(state, segmentId, patch) {
   const segment = state.segments.find((item) => item.id === segmentId);
 
-  if (!segment) {
+  if (!segment || !state.audioBuffer) {
     return;
   }
 
   Object.assign(segment, patch);
 
+  if ("name" in patch) {
+    segment.name = String(segment.name || "").trim() || `segment-${String(segmentId).padStart(2, "0")}`;
+  }
+
   if ("start" in patch || "end" in patch) {
     segment.start = clamp(roundTime(segment.start), 0, state.audioBuffer.duration);
-    segment.end = clamp(roundTime(segment.end), segment.start + 0.05, state.audioBuffer.duration);
+    segment.end = clamp(roundTime(segment.end), segment.start + MIN_SELECTION_SECONDS, state.audioBuffer.duration);
   }
 
   renderSegmentList(state);
@@ -895,7 +1073,7 @@ function removeSegment(state, segmentId) {
   renderSegmentList(state);
   renderWaveform(state);
   updateAudioEditorUI(state);
-  setStatus(state, `${segment.name} 구간이 삭제되었습니다.`);
+  setStatus(state, `${segment.name} 구간을 삭제했습니다.`, { tone: "info" });
 }
 
 function renderSegmentList(state) {
@@ -905,7 +1083,7 @@ function renderSegmentList(state) {
   if (state.segments.length === 0) {
     const empty = document.createElement("p");
     empty.className = "audio-empty-state";
-    empty.textContent = "저장된 구간이 없습니다. 원하는 부분을 선택한 뒤 현재 선택 구간 저장을 눌러보세요.";
+    empty.textContent = "저장한 구간이 없습니다. 파형에서 필요한 부분을 고른 뒤 현재 선택 구간 저장을 눌러 보세요.";
     segmentList.append(empty);
     return;
   }
@@ -921,7 +1099,11 @@ function renderSegmentList(state) {
     title.type = "text";
     title.className = "audio-segment-name";
     title.value = segment.name;
-    title.addEventListener("change", () => updateSegment(state, segment.id, { name: title.value.trim() || `segment-${index + 1}` }));
+    title.disabled = state.isBusy;
+    title.setAttribute("aria-label", `세그먼트 ${index + 1} 이름`);
+    title.addEventListener("change", () => {
+      updateSegment(state, segment.id, { name: title.value });
+    });
 
     const badge = document.createElement("span");
     badge.className = "queue-position";
@@ -940,7 +1122,11 @@ function renderSegmentList(state) {
     startInput.min = "0";
     startInput.step = "0.01";
     startInput.value = segment.start.toFixed(2);
-    startInput.addEventListener("change", () => updateSegment(state, segment.id, { start: Number(startInput.value) }));
+    startInput.disabled = state.isBusy;
+    startInput.setAttribute("aria-label", `${segment.name} 시작 시간`);
+    startInput.addEventListener("change", () => {
+      updateSegment(state, segment.id, { start: Number(startInput.value) });
+    });
     startLabel.append(startText, startInput);
 
     const endLabel = document.createElement("label");
@@ -951,7 +1137,11 @@ function renderSegmentList(state) {
     endInput.min = "0";
     endInput.step = "0.01";
     endInput.value = segment.end.toFixed(2);
-    endInput.addEventListener("change", () => updateSegment(state, segment.id, { end: Number(endInput.value) }));
+    endInput.disabled = state.isBusy;
+    endInput.setAttribute("aria-label", `${segment.name} 끝 시간`);
+    endInput.addEventListener("change", () => {
+      updateSegment(state, segment.id, { end: Number(endInput.value) });
+    });
     endLabel.append(endText, endInput);
 
     grid.append(startLabel, endLabel);
@@ -966,6 +1156,7 @@ function renderSegmentList(state) {
     const playButton = document.createElement("button");
     playButton.type = "button";
     playButton.textContent = "구간 재생";
+    playButton.disabled = state.isBusy;
     playButton.addEventListener("click", () => {
       void startPlayback(state, segment.start, segment.end, { allowLoop: true });
     });
@@ -973,22 +1164,29 @@ function renderSegmentList(state) {
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.textContent = "MP3 저장";
+    exportButton.disabled = state.isBusy || !window.lamejs;
+    exportButton.setAttribute("aria-busy", String(state.isBusy && state.busyTarget === `segment-export-${segment.id}`));
     exportButton.addEventListener("click", () => {
       void exportSingleSegment(state, segment.id);
     });
 
     const useSelectionButton = document.createElement("button");
     useSelectionButton.type = "button";
-    useSelectionButton.textContent = "이 구간으로 선택";
+    useSelectionButton.textContent = "이 구간 선택";
+    useSelectionButton.disabled = state.isBusy;
     useSelectionButton.addEventListener("click", () => {
       setSelectionBounds(state, segment.start, segment.end);
+      setStatus(state, `${segment.name} 구간을 현재 선택 영역으로 불러왔습니다.`, { tone: "info" });
     });
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "remove-file-button";
     deleteButton.textContent = "삭제";
-    deleteButton.addEventListener("click", () => removeSegment(state, segment.id));
+    deleteButton.disabled = state.isBusy;
+    deleteButton.addEventListener("click", () => {
+      removeSegment(state, segment.id);
+    });
 
     actions.append(playButton, exportButton, useSelectionButton, deleteButton);
     card.append(header, grid, meta, actions);
@@ -999,9 +1197,14 @@ function renderSegmentList(state) {
 function updateAudioEditorUI(state, options = {}) {
   const { elements } = state;
   const hasAudio = Boolean(state.audioBuffer);
-  const canExport = hasAudio && !state.isBusy;
-  const canExportZip = canExport && state.segments.length > 0;
+  const canEncodeMp3 = Boolean(window.lamejs);
+  const canCreateZip = Boolean(window.JSZip);
+  const canExportSelection = hasAudio && !state.isBusy && canEncodeMp3;
+  const canExportZip = canExportSelection && state.segments.length > 0 && canCreateZip;
 
+  elements.panel.setAttribute("aria-busy", String(state.isBusy));
+  elements.dropzone.setAttribute("aria-busy", String(state.isBusy && state.busyTarget === "load-file"));
+  elements.dropzone.setAttribute("aria-disabled", String(state.isBusy));
   elements.waveEmpty.hidden = hasAudio;
   elements.fileName.textContent = hasAudio ? state.file.name : "No file loaded";
   elements.fileMeta.textContent = hasAudio
@@ -1014,38 +1217,88 @@ function updateAudioEditorUI(state, options = {}) {
   elements.trimStart.value = hasAudio ? state.selectionStart.toFixed(2) : "0";
   elements.trimEnd.value = hasAudio ? state.selectionEnd.toFixed(2) : "0";
 
+  elements.input.disabled = state.isBusy;
   elements.playButton.disabled = !hasAudio || state.isBusy;
   elements.playButton.textContent = state.activePlayback ? "일시정지" : "재생";
+  elements.playButton.setAttribute("aria-pressed", String(Boolean(state.activePlayback)));
   elements.stopButton.disabled = !hasAudio || state.isBusy;
   elements.setStartButton.disabled = !hasAudio || state.isBusy;
   elements.setEndButton.disabled = !hasAudio || state.isBusy;
   elements.trimReset.disabled = !hasAudio || state.isBusy;
   elements.resetButton.disabled = !hasAudio || state.isBusy;
-  elements.exportSelection.disabled = !canExport;
+  elements.exportSelection.disabled = !canExportSelection;
   elements.exportZip.disabled = !canExportZip;
   elements.addSegment.disabled = !hasAudio || state.isBusy;
   elements.trimStart.disabled = !hasAudio || state.isBusy;
   elements.trimEnd.disabled = !hasAudio || state.isBusy;
   elements.playbackRate.disabled = state.isBusy;
   elements.loopPreview.disabled = !hasAudio || state.isBusy;
+  elements.segmentName.disabled = !hasAudio || state.isBusy;
+
+  elements.exportSelection.setAttribute("aria-busy", String(state.isBusy && state.busyTarget === "export-selection"));
+  elements.exportZip.setAttribute("aria-busy", String(state.isBusy && state.busyTarget === "export-zip"));
+
+  updateWaveformAccessibility(state);
 
   if (!options.skipSegments) {
     renderSegmentList(state);
   }
 }
 
-function setBusy(state, isBusy, message = "") {
-  state.isBusy = isBusy;
+function updateWaveformAccessibility(state) {
+  const { waveform } = state.elements;
+  const hasAudio = Boolean(state.audioBuffer);
+  const duration = hasAudio ? state.audioBuffer.duration : 0;
+  const playhead = clamp(state.playhead, 0, duration);
 
-  if (message) {
-    setStatus(state, message);
+  waveform.setAttribute("aria-valuemin", "0");
+  waveform.setAttribute("aria-valuemax", duration.toFixed(2));
+  waveform.setAttribute("aria-valuenow", playhead.toFixed(2));
+  waveform.setAttribute("aria-disabled", String(!hasAudio || state.isBusy));
+
+  if (!hasAudio) {
+    waveform.setAttribute("aria-valuetext", "오디오가 아직 로드되지 않았습니다.");
+    return;
+  }
+
+  waveform.setAttribute(
+    "aria-valuetext",
+    `현재 재생 위치 ${formatTime(playhead)}, 전체 길이 ${formatTime(duration)}, 선택 구간 ${formatTime(
+      state.selectionStart
+    )}부터 ${formatTime(state.selectionEnd)}까지`
+  );
+}
+
+function setBusy(state, isBusy, options = {}) {
+  state.isBusy = isBusy;
+  state.busyTarget = isBusy ? options.target || null : null;
+
+  if (options.message) {
+    setStatus(state, options.message, { tone: options.tone || "info" });
   }
 
   updateAudioEditorUI(state);
 }
 
-function setStatus(state, message) {
+function setStatus(state, message, options = {}) {
   state.elements.status.textContent = message;
+  state.elements.status.dataset.statusTone = options.tone || "info";
+}
+
+function interpretLoadError(error) {
+  if (!error) {
+    return "오디오 파일을 해석하지 못했습니다. 다른 MP3 파일로 다시 시도해 주세요.";
+  }
+
+  if (error.message === "AUDIO_CONTEXT_UNSUPPORTED") {
+    return "이 브라우저는 Web Audio를 지원하지 않아 MP3 편집기를 사용할 수 없습니다.";
+  }
+
+  if (error.name === "EncodingError" || error.name === "NotSupportedError") {
+    return "브라우저가 이 오디오 파일을 해석하지 못했습니다. 손상되지 않은 MP3인지 확인해 주세요.";
+  }
+
+  return "오디오 파일을 해석하지 못했습니다. 파일 형식, 브라우저 메모리, 손상 여부를 확인한 뒤 다시 시도해 주세요.";
 }
 
 function buildAudioFileName(state, suffix) {
@@ -1073,7 +1326,7 @@ function downloadBlob(blob, fileName) {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function formatTime(seconds) {
@@ -1107,4 +1360,11 @@ function hasDraggedFiles(event) {
   }
 
   return Array.from(types).includes("Files");
+}
+
+function isSupportedAudioFile(file) {
+  const fileName = String(file?.name || "").toLowerCase();
+  const type = String(file?.type || "").toLowerCase();
+
+  return fileName.endsWith(".mp3") && (!type || ["audio/mpeg", "audio/mp3", "audio/x-mpeg"].includes(type));
 }
