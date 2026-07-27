@@ -15,6 +15,7 @@ const runtimeScripts = [
   "converter-pdf-to-images.js",
   "converter-ppt-to-images.js",
   "editor-image.js",
+  "editor-image-batch.js",
   "editor-mp3.js",
   "home.js",
 ];

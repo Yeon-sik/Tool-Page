@@ -264,7 +264,7 @@ test("PPTX 페이지 비율과 파일명 레이어를 생성 설정에 반영함
 
 test("이미지 편집기는 JPG 형식으로 실제 다운로드함", async ({ page }) => {
   await page.goto("/tools/image-editor.html");
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('[data-image-editor] input[type="file"]').setInputFiles({
     name: "pixel.png",
     mimeType: "image/png",
     buffer: tinyPng,
@@ -283,4 +283,72 @@ test("이미지 편집기는 JPG 형식으로 실제 다운로드함", async ({ 
   const bytes = Buffer.concat(chunks);
   expect(Array.from(bytes.subarray(0, 3))).toEqual([255, 216, 255]);
   expect(download.suggestedFilename()).toMatch(/-edited\.jpg$/i);
+});
+
+test("이미지 일괄 편집은 여러 파일을 공통 크기로 수정해 ZIP으로 저장함", async ({ page }) => {
+  await page.goto("/tools/image-editor.html", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "여러 장 일괄 편집" }).click();
+  await expect(page.locator("#batch-image-editor-panel")).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 900 });
+
+  await page.locator('[data-role="batch-input"]').setInputFiles([
+    { name: "first.png", mimeType: "image/png", buffer: tinyPng },
+    { name: "second.png", mimeType: "image/png", buffer: tinyPng },
+  ]);
+  await expect(page.locator(".batch-file-card")).toHaveCount(2);
+  await expect(page.locator('[data-role="batch-status"]')).toContainText("2장을 준비");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  await page.locator('[data-role="batch-width"]').fill("4");
+  await page.locator('[data-role="batch-height"]').fill("3");
+  await page.locator('[data-role="batch-fit-mode"]').selectOption("stretch");
+  await page.locator('[data-role="batch-format"]').selectOption("png");
+
+  const accessibility = await new AxeBuilder({ page }).include("#batch-image-editor-panel").analyze();
+  expect(accessibility.violations, JSON.stringify(accessibility.violations, null, 2)).toEqual([]);
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "일괄 수정 후 ZIP 저장" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("images-4x3.zip");
+
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  const archiveBytes = Buffer.concat(chunks);
+  const entries = await page.evaluate(async (bytes) => {
+    const archive = await window.JSZip.loadAsync(Uint8Array.from(bytes));
+    const results = [];
+
+    for (const name of Object.keys(archive.files).sort()) {
+      const content = await archive.files[name].async("uint8array");
+      const view = new DataView(content.buffer, content.byteOffset, content.byteLength);
+      results.push({
+        name,
+        signature: Array.from(content.slice(0, 8)),
+        width: view.getUint32(16),
+        height: view.getUint32(20),
+      });
+    }
+
+    return results;
+  }, Array.from(archiveBytes));
+
+  expect(entries).toEqual([
+    {
+      name: "first-4x3.png",
+      signature: [137, 80, 78, 71, 13, 10, 26, 10],
+      width: 4,
+      height: 3,
+    },
+    {
+      name: "second-4x3.png",
+      signature: [137, 80, 78, 71, 13, 10, 26, 10],
+      width: 4,
+      height: 3,
+    },
+  ]);
 });

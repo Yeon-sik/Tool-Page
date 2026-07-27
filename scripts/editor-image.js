@@ -415,15 +415,10 @@ async function loadImageFile(state, file) {
     return;
   }
 
-  const hasSupportedType = !file.type || ["image/png", "image/jpeg", "image/webp"].includes(file.type);
+  const validationError = getImageEditorFileValidationError(file);
 
-  if (!hasSupportedType || !/\.(png|jpe?g|webp)$/i.test(file.name)) {
-    setStatus(state, "PNG, JPG, WEBP 이미지 파일만 업로드할 수 있습니다.");
-    return;
-  }
-
-  if (file.size > IMAGE_EDITOR_MAX_FILE_BYTES) {
-    setStatus(state, `파일이 너무 큽니다. 이미지 편집기는 ${formatFileSize(IMAGE_EDITOR_MAX_FILE_BYTES)} 이하 파일을 지원합니다.`);
+  if (validationError) {
+    setStatus(state, validationError);
     state.elements.input.value = "";
     return;
   }
@@ -434,7 +429,7 @@ async function loadImageFile(state, file) {
     const width = image.naturalWidth || image.width;
     const height = image.naturalHeight || image.height;
 
-    if (!width || !height || width * height > IMAGE_EDITOR_MAX_PIXELS) {
+    if (!isImageEditorDimensionAllowed(width, height)) {
       throw new Error("IMAGE_DIMENSION_LIMIT");
     }
 
@@ -1137,6 +1132,24 @@ function formatFileSize(bytes) {
   return `${value >= 10 || unitIndex === 0 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
+function getImageEditorFileValidationError(file) {
+  const hasSupportedType = !file?.type || ["image/png", "image/jpeg", "image/webp"].includes(file.type);
+
+  if (!file || !hasSupportedType || !/\.(png|jpe?g|webp)$/i.test(file.name)) {
+    return "PNG, JPG, WEBP 이미지 파일만 업로드할 수 있습니다.";
+  }
+
+  if (file.size > IMAGE_EDITOR_MAX_FILE_BYTES) {
+    return `파일이 너무 큽니다. 이미지 편집기는 ${formatFileSize(IMAGE_EDITOR_MAX_FILE_BYTES)} 이하 파일을 지원합니다.`;
+  }
+
+  return "";
+}
+
+function isImageEditorDimensionAllowed(width, height) {
+  return Boolean(width && height && width * height <= IMAGE_EDITOR_MAX_PIXELS);
+}
+
 function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1166,3 +1179,15 @@ function hasDraggedFiles(event) {
 
   return Array.from(types).includes("Files");
 }
+
+window.ImageEditorCore = Object.freeze({
+  MAX_FILE_BYTES: IMAGE_EDITOR_MAX_FILE_BYTES,
+  MAX_PIXELS: IMAGE_EDITOR_MAX_PIXELS,
+  canvasToBlob,
+  downloadBlob,
+  flattenCanvas,
+  formatFileSize,
+  getImageEditorFileValidationError,
+  isImageEditorDimensionAllowed,
+  loadImageFromFile,
+});

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function loadWorker() {
@@ -65,4 +66,14 @@ test("정적 사이트는 상태 변경 메서드를 거부함", async () => {
 
   assert.equal(response.status, 405);
   assert.equal(response.headers.get("Allow"), "GET, HEAD");
+});
+
+test("이미지 일괄 편집 런타임을 배포 자산에 포함함", async () => {
+  const batchScript = new URL("../dist/client/scripts/editor-image-batch.js", import.meta.url);
+  const editorPage = new URL("../dist/client/tools/image-editor.html", import.meta.url);
+
+  await access(batchScript);
+  const html = await readFile(editorPage, "utf8");
+  assert.match(html, /editor-image-batch\.js\?v=20260728b/);
+  assert.match(html, /jszip-3\.10\.1\.min\.js/);
 });
