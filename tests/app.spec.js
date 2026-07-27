@@ -75,6 +75,20 @@ test("GIF 큐는 키보드로 순서를 바꿀 수 있음", async ({ page }) => 
   await expect(page.locator("[data-role=status]")).toContainText("이동");
 });
 
+test("여러 파일은 이름순으로 정렬하고 정렬 방향을 즉시 바꿀 수 있음", async ({ page }) => {
+  await page.goto("/tools/images-to-gif.html", { waitUntil: "networkidle" });
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: "frame-10.png", mimeType: "image/png", buffer: tinyPng },
+    { name: "frame-2.png", mimeType: "image/png", buffer: tinyPng },
+  ]);
+
+  const fileNames = page.locator(".queue-card .file-meta strong");
+  await expect(fileNames).toHaveText(["frame-2.png", "frame-10.png"]);
+  await page.getByRole("button", { name: "파일 이름 내림차순" }).click();
+  await expect(fileNames).toHaveText(["frame-10.png", "frame-2.png"]);
+  await expect(page.locator("[data-role=status]")).toContainText("내림차순");
+});
+
 test("이미지 변환은 실제 PNG를 다운로드함", async ({ page }) => {
   await page.goto("/tools/converter.html", { waitUntil: "networkidle" });
   const convertButton = page.locator('[data-action="convert"]');
@@ -192,6 +206,60 @@ test("PDF와 PPT 방향 전환은 패널과 접근성 상태를 함께 갱신함
     await expect(page.locator(visiblePanel)).toBeVisible();
     await expect(page.locator(hiddenPanel)).toBeHidden();
   }
+});
+
+test("PPTX 페이지 비율과 파일명 레이어를 생성 설정에 반영함", async ({ page }) => {
+  await page.goto("/tools/ppt.html", { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    window.__pptxLayout = null;
+    window.__pptxLayoutDefinition = null;
+    window.__pptxSlideCalls = [];
+    window.PptxGenJS = class FakePptxGenJs {
+      set layout(value) {
+        window.__pptxLayout = value;
+      }
+
+      defineLayout(value) {
+        window.__pptxLayoutDefinition = value;
+      }
+
+      addSlide() {
+        return {
+          addImage() {
+            window.__pptxSlideCalls.push("image");
+          },
+          addText() {
+            window.__pptxSlideCalls.push("text");
+          },
+        };
+      }
+
+      async write() {
+        return new Blob(["pptx"], {
+          type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        });
+      }
+    };
+  });
+
+  await page.getByLabel("슬라이드 비율").selectOption("a4");
+  await page.getByLabel("파일명 표시").check();
+  await page.locator('#images-to-pptx-panel input[type="file"]').setInputFiles({
+    name: "page.png",
+    mimeType: "image/png",
+    buffer: tinyPng,
+  });
+  await page.locator('#images-to-pptx-panel [data-action="convert"]').click();
+  await expect(page.locator("#images-to-pptx-panel [data-role=status]")).toContainText("1개 결과 파일");
+
+  const pptxState = await page.evaluate(() => ({
+    layout: window.__pptxLayout,
+    definition: window.__pptxLayoutDefinition,
+    calls: window.__pptxSlideCalls,
+  }));
+  expect(pptxState.layout).toBe("LAYOUT_A4_PORTRAIT");
+  expect(pptxState.definition).toMatchObject({ width: 8.27, height: 11.69 });
+  expect(pptxState.calls).toEqual(["image", "text"]);
 });
 
 test("이미지 편집기는 JPG 형식으로 실제 다운로드함", async ({ page }) => {
