@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="이미지를 서버 업로드 없이 브라우저에서 자르고, 회전하고, 텍스트를 추가한 뒤 PNG·JPG·WEBP로 저장합니다."
+      content="이미지를 서버 업로드 없이 브라우저에서 자르고 회전하거나, 여러 장을 같은 크기로 일괄 조정해 PNG·JPG·WEBP로 저장합니다."
     />
     <meta name="theme-color" content="#080008" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
@@ -15,8 +15,10 @@
     />
     <title>이미지 편집 | Tool Page</title>
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="../styles.css?v=20260728" />
-    <script defer src="../scripts/editor-image.js?v=20260728"></script>
+    <link rel="stylesheet" href="../styles.css?v=20260728b" />
+    <script defer src="../assets/vendor/jszip-3.10.1.min.js"></script>
+    <script defer src="../scripts/editor-image.js?v=20260728b"></script>
+    <script defer src="../scripts/editor-image-batch.js?v=20260728b"></script>
   </head>
   <body data-page="image-editor">
     <a class="skip-link" href="#main-content">편집 작업으로 바로가기</a>
@@ -26,13 +28,38 @@
         <p class="eyebrow">EDITOR 08</p>
         <h1>Image Editor</h1>
         <p class="hero-copy">
-          이미지를 업로드한 뒤 확대와 축소로 확인하고, 회전과 자르기, 텍스트 추가, 되돌리기와 초기화까지 한 페이지에서
-          처리할 수 있습니다.
+          한 장을 세밀하게 자르고 회전하거나, 여러 이미지를 같은 크기와 형식으로 한 번에 맞출 수 있습니다. 모든 작업은
+          현재 브라우저 안에서 처리됩니다.
         </p>
       </header>
 
       <main id="main-content" tabindex="-1">
-        <section class="tool-panel image-editor-panel" data-image-editor>
+        <div class="direction-switcher image-editor-mode-switcher" data-role="image-editor-mode-switcher" aria-label="이미지 편집 모드">
+          <button
+            type="button"
+            data-editor-mode-target="single"
+            aria-controls="single-image-editor-panel"
+            aria-pressed="true"
+            class="is-active"
+          >
+            한 장 정밀 편집
+          </button>
+          <button
+            type="button"
+            data-editor-mode-target="batch"
+            aria-controls="batch-image-editor-panel"
+            aria-pressed="false"
+          >
+            여러 장 일괄 편집
+          </button>
+        </div>
+
+        <section
+          id="single-image-editor-panel"
+          class="tool-panel image-editor-panel"
+          data-image-editor
+          data-editor-mode-panel="single"
+        >
           <div class="tool-heading">
             <p class="eyebrow">UPLOAD</p>
             <h2>편집할 이미지 업로드</h2>
@@ -201,6 +228,139 @@
                 <p class="audio-helper">PNG는 투명도를 유지하며 JPG는 선택한 배경색으로 투명 영역을 채웁니다.</p>
               </section>
             </aside>
+          </div>
+        </section>
+
+        <section
+          id="batch-image-editor-panel"
+          class="tool-panel image-batch-panel"
+          data-image-batch-editor
+          data-editor-mode-panel="batch"
+          hidden
+        >
+          <div class="tool-heading">
+            <p class="eyebrow">BATCH RESIZE</p>
+            <h2>여러 이미지를 같은 크기로 맞추기</h2>
+            <p>이미지마다 비율이 달라도 하나의 너비와 높이, 배치 방식, 출력 형식을 적용해 ZIP으로 저장합니다.</p>
+          </div>
+
+          <p class="local-processing-note">
+            <strong>내 기기에서 일괄 처리:</strong> 파일은 서버로 전송하지 않습니다. 한 번에 최대 50장, 파일당 60MB, 전체
+            250MB까지 준비할 수 있으며 결과 한 장은 최대 2,400만 픽셀입니다.
+          </p>
+
+          <div class="uploader-box image-uploader-box">
+            <label class="upload-control">
+              <input
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                data-role="batch-input"
+              />
+              <span>여러 이미지 선택</span>
+            </label>
+            <div class="tool-actions">
+              <button type="button" data-action="batch-clear" disabled>목록 비우기</button>
+              <button type="button" data-action="batch-cancel" disabled>처리 취소</button>
+              <button type="button" data-action="batch-download" disabled>일괄 수정 후 ZIP 저장</button>
+            </div>
+          </div>
+
+          <div
+            class="image-dropzone"
+            data-role="batch-dropzone"
+            role="button"
+            tabindex="0"
+            aria-label="여러 이미지 파일 선택 또는 드래그 앤 드롭"
+          >
+            이곳을 누르거나 여러 이미지 파일을 한 번에 드래그하세요
+          </div>
+
+          <p
+            class="status-line"
+            data-role="batch-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-tone="idle"
+          >
+            여러 이미지를 선택한 뒤 공통 크기와 맞춤 방식을 설정하세요.
+          </p>
+
+          <div class="batch-editor-grid">
+            <section class="batch-settings-card" aria-labelledby="batch-settings-title">
+              <div class="settings-heading">
+                <p class="eyebrow">COMMON SETTINGS</p>
+                <h3 id="batch-settings-title">공통 크기와 출력 설정</h3>
+                <p>모든 결과 파일은 아래 설정으로 동일한 캔버스 크기를 사용합니다.</p>
+              </div>
+
+              <div class="batch-settings-grid">
+                <label class="image-single-field">
+                  <span>크기 프리셋</span>
+                  <select data-role="batch-size-preset">
+                    <option value="custom">직접 입력</option>
+                    <option value="1080x1080">정사각형 · 1080 × 1080</option>
+                    <option value="1920x1080">Full HD · 1920 × 1080</option>
+                    <option value="1200x630">공유 이미지 · 1200 × 630</option>
+                    <option value="800x600">문서 이미지 · 800 × 600</option>
+                  </select>
+                </label>
+
+                <div class="image-field-grid">
+                  <label class="image-single-field">
+                    <span>공통 너비(px)</span>
+                    <input type="number" min="1" max="8192" step="1" value="1080" data-role="batch-width" />
+                  </label>
+                  <label class="image-single-field">
+                    <span>공통 높이(px)</span>
+                    <input type="number" min="1" max="8192" step="1" value="1080" data-role="batch-height" />
+                  </label>
+                </div>
+
+                <label class="image-single-field">
+                  <span>이미지 배치 방식</span>
+                  <select data-role="batch-fit-mode">
+                    <option value="contain">전체 맞춤 · 여백 포함</option>
+                    <option value="cover">꽉 채우기 · 가운데 자르기</option>
+                    <option value="stretch">크기에 맞게 늘이기</option>
+                  </select>
+                </label>
+
+                <label class="image-single-field">
+                  <span>여백 또는 JPG 배경색</span>
+                  <input type="color" value="#ffffff" data-role="batch-background" />
+                </label>
+
+                <label class="image-single-field">
+                  <span>출력 파일 형식</span>
+                  <select data-role="batch-format">
+                    <option value="original">원본 형식 유지</option>
+                    <option value="png">PNG · 선명한 이미지</option>
+                    <option value="jpeg">JPG · 작은 용량</option>
+                    <option value="webp">WEBP · 고효율 압축</option>
+                  </select>
+                </label>
+
+                <label class="image-single-field" data-role="batch-quality-field">
+                  <span>압축 품질 <strong data-role="batch-quality-label">92%</strong></span>
+                  <input type="range" min="0.6" max="1" step="0.01" value="0.92" data-role="batch-quality" />
+                </label>
+              </div>
+
+              <p class="audio-helper">
+                전체 맞춤은 비율을 유지하고 남는 영역을 배경색으로 채웁니다. 꽉 채우기는 비율을 유지한 채 중앙을 자릅니다.
+              </p>
+            </section>
+
+            <section class="batch-queue-card" aria-labelledby="batch-queue-title">
+              <div class="section-heading batch-section-heading">
+                <p class="eyebrow">QUEUE</p>
+                <h3 id="batch-queue-title">일괄 처리 목록</h3>
+                <p data-role="batch-summary">선택된 이미지가 없습니다.</p>
+              </div>
+              <div class="batch-file-list" data-role="batch-list"></div>
+            </section>
           </div>
         </section>
       </main>
