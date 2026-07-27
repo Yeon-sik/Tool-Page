@@ -141,6 +141,14 @@ async function createPptxResult(files, settings, jobToken, state, api) {
 
     slide.background = { color: backgroundColor };
 
+    slide.addImage({
+      data: dataUrl,
+      x: (slideWidth - placement.width) / 2,
+      y: margin + (usableHeight - placement.height) / 2,
+      w: placement.width,
+      h: placement.height,
+    });
+
     if (settings.pptxFileLabel) {
       slide.addText(file.name, {
         x: labelInset,
@@ -155,14 +163,6 @@ async function createPptxResult(files, settings, jobToken, state, api) {
         margin: 0,
       });
     }
-
-    slide.addImage({
-      data: dataUrl,
-      x: (slideWidth - placement.width) / 2,
-      y: margin + (usableHeight - placement.height) / 2,
-      w: placement.width,
-      h: placement.height,
-    });
   }
 
   api.assertJobActive(state, jobToken);

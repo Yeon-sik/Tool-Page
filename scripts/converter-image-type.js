@@ -17,6 +17,8 @@ const IMAGE_TYPE_OUTPUTS = {
 };
 
 const IMAGE_TYPE_INPUT_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "svg", "tif", "tiff"]);
+const IMAGE_TYPE_MAX_PIXELS = 80_000_000;
+const IMAGE_TYPE_MAX_DIMENSION = 16_384;
 
 ToolPage.registerTool("converter-image-type", {
   mode: "image",
@@ -251,6 +253,8 @@ async function renderInputFileToCanvas(file, api) {
     throw new Error(`${file.name} 이미지 크기를 읽을 수 없습니다.`);
   }
 
+  assertSafeImageDimensions(width, height, file.name);
+
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -277,11 +281,18 @@ async function renderTiffToCanvas(file) {
     throw new Error(`${file.name} TIFF 이미지를 읽을 수 없습니다.`);
   }
 
+  if (ifds.length > 1) {
+    throw new Error(
+      `${file.name} 파일은 ${ifds.length}페이지 TIFF입니다. 데이터 누락을 막기 위해 단일 페이지 TIFF만 변환할 수 있습니다.`
+    );
+  }
+
   window.UTIF.decodeImage(arrayBuffer, firstImage);
 
   const rgba = window.UTIF.toRGBA8(firstImage);
   const width = firstImage.width;
   const height = firstImage.height;
+  assertSafeImageDimensions(width, height, file.name);
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -312,7 +323,25 @@ async function canvasToRequestedImageBlob(sourceCanvas, options) {
   }
 
   context.drawImage(sourceCanvas, 0, 0);
-  return ToolPage.canvasToBlob(exportCanvas, options.mimeType, options.quality);
+  const blob = await ToolPage.canvasToBlob(exportCanvas, options.mimeType, options.quality);
+
+  if (blob.type && blob.type !== options.mimeType) {
+    throw new Error(
+      `이 브라우저는 ${options.outputFormat.toUpperCase()} 저장을 지원하지 않습니다. PNG 또는 JPG로 다시 시도해 주세요.`
+    );
+  }
+
+  return blob;
+}
+
+function assertSafeImageDimensions(width, height, fileName) {
+  if (width > IMAGE_TYPE_MAX_DIMENSION || height > IMAGE_TYPE_MAX_DIMENSION || width * height > IMAGE_TYPE_MAX_PIXELS) {
+    throw new Error(
+      `${fileName} 해상도가 브라우저 안전 한도를 넘습니다. 한 변 ${IMAGE_TYPE_MAX_DIMENSION.toLocaleString()}px, 총 ${(
+        IMAGE_TYPE_MAX_PIXELS / 1_000_000
+      ).toFixed(0)}MP 이하 이미지를 사용해 주세요.`
+    );
+  }
 }
 
 function getFileExtension(fileName) {

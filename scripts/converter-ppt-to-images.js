@@ -1,4 +1,5 @@
 const PPTX_EMU_PER_INCH = 914400;
+const PPTX_MAX_SLIDES = 100;
 const PPTX_DEFAULT_SLIDE_SIZE = {
   width: 12192000,
   height: 6858000,
@@ -91,6 +92,12 @@ async function createPptImageResults(files, settings, jobToken, state, api) {
     throw new Error("PPTX 파일을 읽지 못했습니다. 암호화되었거나 손상된 파일인지 확인해 주세요.");
   }
 
+  if (deck.slidePaths.length > PPTX_MAX_SLIDES) {
+    throw new Error(
+      `이 브라우저 도구는 한 번에 최대 ${PPTX_MAX_SLIDES}슬라이드까지 변환합니다. PPTX를 나눈 뒤 다시 시도해 주세요.`
+    );
+  }
+
   const output = api.resolvePageImageOutput(settings);
   const targetWidth = Math.max(320, Number(settings.pptImageWidth || 1920));
   const targetHeight = Math.max(1, Math.round((deck.slideSize.height / deck.slideSize.width) * targetWidth));
@@ -112,7 +119,7 @@ async function createPptImageResults(files, settings, jobToken, state, api) {
     context.fillStyle = output.backgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    await renderPptxSlide(deck, deck.slidePaths[index], canvas, context, output.backgroundColor, api);
+    await renderPptxSlide(deck, deck.slidePaths[index], canvas, context, output.backgroundColor, api, index + 1);
 
     results.push(
       await api.createCanvasImageResult(canvas, output, settings, {
@@ -163,8 +170,9 @@ async function readPptxDeck(zip) {
   };
 }
 
-async function renderPptxSlide(deck, slidePath, canvas, context, fallbackBackground, api) {
+async function renderPptxSlide(deck, slidePath, canvas, context, fallbackBackground, api, slideNumber) {
   const slideDoc = await readXmlFromZip(deck.zip, slidePath);
+  assertSupportedPptxElements(slideDoc, slideNumber);
   const relationships = await readPptxSlideRelationships(deck.zip, slidePath);
   const scaleX = canvas.width / deck.slideSize.width;
   const scaleY = canvas.height / deck.slideSize.height;
@@ -190,6 +198,48 @@ async function renderPptxSlide(deck, slidePath, canvas, context, fallbackBackgro
       slideSize: deck.slideSize,
       api,
     });
+  }
+}
+
+function assertSupportedPptxElements(slideDoc, slideNumber) {
+  const shapeTree = getFirstByLocalName(slideDoc, "spTree");
+
+  if (!shapeTree) {
+    return;
+  }
+
+  const supported = new Set(["pic", "sp", "grpSp", "nvGrpSpPr", "grpSpPr", "extLst"]);
+  const unsupported = new Set();
+  const inspect = (element) => {
+    const name = getLocalName(element);
+
+    if (!supported.has(name)) {
+      unsupported.add(name || "알 수 없는 요소");
+      return;
+    }
+
+    if (name === "grpSp") {
+      Array.from(element.children).forEach(inspect);
+    }
+  };
+
+  Array.from(shapeTree.children).forEach(inspect);
+
+  if (unsupported.size > 0) {
+    const labels = {
+      graphicFrame: "표·차트·SmartArt",
+      cxnSp: "연결선",
+      contentPart: "외부 콘텐츠",
+      oleObj: "삽입 개체",
+    };
+    const description = Array.from(unsupported)
+      .map((name) => labels[name] || name)
+      .join(", ");
+
+    throw new Error(
+      `${slideNumber}번 슬라이드에 현재 브라우저 변환이 정확히 처리할 수 없는 요소(${description})가 있습니다. ` +
+        "데이터 누락을 막기 위해 변환을 중단했습니다. 텍스트·기본 도형·이미지만 포함된 PPTX를 사용해 주세요."
+    );
   }
 }
 

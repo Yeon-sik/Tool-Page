@@ -1,5 +1,4 @@
-const GIF_WORKER_CDN_URL = "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js";
-let gifWorkerScriptUrlPromise = null;
+const GIF_WORKER_URL = new URL("../assets/vendor/gif-0.2.0.worker.js", document.baseURI).href;
 
 ToolPage.registerTool("images-to-gif", {
   mode: "gif",
@@ -57,8 +56,9 @@ ToolPage.registerTool("images-to-gif", {
       defaultValue: "0",
       options: [
         { value: "0", label: "무한 반복" },
-        { value: "1", label: "1회 재생" },
-        { value: "3", label: "3회 반복" },
+        { value: "-1", label: "1회 재생" },
+        { value: "1", label: "2회 재생" },
+        { value: "3", label: "4회 재생" },
       ],
     },
     {
@@ -127,15 +127,19 @@ async function createGifResult(files, settings, frameSettings, jobToken, state, 
   const qualityProfile = getGifQualityProfile(settings.gifQualityProfile || "balanced");
   const frameDelay = Number(settings.gifFrameDelay || 180);
   const repeat = Number(settings.gifRepeat || 0);
-  const workerScript = await resolveGifWorkerScriptUrl();
   const gif = new window.GIF({
     workers: 2,
-    workerScript,
+    workerScript: GIF_WORKER_URL,
     width: canvasSize.width,
     height: canvasSize.height,
     quality: qualityProfile.quality,
     repeat,
     background: settings.gifBackground || "#000000",
+  });
+  api.setJobCancellation(state, jobToken, () => {
+    if (typeof gif.abort === "function") {
+      gif.abort();
+    }
   });
 
   images.forEach((image, index) => {
@@ -176,36 +180,6 @@ async function createGifResult(files, settings, frameSettings, jobToken, state, 
   };
 }
 
-async function resolveGifWorkerScriptUrl() {
-  if (gifWorkerScriptUrlPromise) {
-    return gifWorkerScriptUrlPromise;
-  }
-
-  gifWorkerScriptUrlPromise = fetchGifWorkerScriptUrl();
-  return gifWorkerScriptUrlPromise;
-}
-
-async function fetchGifWorkerScriptUrl() {
-  try {
-    const response = await fetch(GIF_WORKER_CDN_URL, {
-      mode: "cors",
-      cache: "force-cache",
-    });
-
-    if (!response.ok) {
-      throw new Error(`GIF worker request failed with ${response.status}`);
-    }
-
-    const source = await response.text();
-    const blob = new Blob([source], { type: "text/javascript" });
-    return URL.createObjectURL(blob);
-  } catch (error) {
-    gifWorkerScriptUrlPromise = null;
-    console.error(error);
-    throw new Error("GIF worker 스크립트를 준비하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
-  }
-}
-
 function createGifQueueUtilityBar(state, api) {
   const toolbar = document.createElement("div");
   toolbar.className = "queue-utility-bar";
@@ -225,7 +199,7 @@ function createGifDuplicateButton(state, index, fileName, api) {
   button.type = "button";
   button.className = "duplicate-file-button";
   button.textContent = "COPY";
-  button.setAttribute("aria-label", `${fileName} frame duplicate`);
+  button.setAttribute("aria-label", `${fileName} 프레임 복제`);
   button.addEventListener("click", () => duplicateGifFrameAtIndex(state, index, api));
   return button;
 }
@@ -312,7 +286,7 @@ function reverseGifFrames(state, api) {
   state.pointerDrag = null;
   state.downloadAllButton.disabled = true;
   api.renderState(state);
-  state.status.textContent = "GIF frame order reversed.";
+  state.status.textContent = "GIF 프레임 순서를 뒤집었습니다. 현재 순서로 다시 생성해 주세요.";
 }
 
 function resolveGifCanvasSize(firstImage, maxWidthSetting) {
@@ -377,7 +351,7 @@ function describeLoopCount(repeat) {
     return "무한 반복";
   }
 
-  return `${repeat}회 재생`;
+  return `${Math.max(1, repeat + 1)}회 재생`;
 }
 
 function summarizeFrameDelays(frameSettings, fallbackDelay) {

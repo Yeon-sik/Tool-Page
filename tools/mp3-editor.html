@@ -3,54 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MP3 Editor | Tool Page</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Pixelify+Sans:wght@500;600;700&display=swap"
-      rel="stylesheet"
+    <meta
+      name="description"
+      content="브라우저 안에서 MP3를 잘라 보고, 구간을 나누고, 선택 구간과 세그먼트를 MP3로 저장하는 로컬 MP3 편집기입니다."
     />
-    <link rel="stylesheet" href="../styles.css" />
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
-    <script defer src="../scripts/editor-mp3.js"></script>
+    <meta name="theme-color" content="#050005" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; media-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; form-action 'self'"
+    />
+    <title>MP3 편집 | Tool Page</title>
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../styles.css?v=20260728" />
+    <script defer src="../assets/vendor/jszip-3.10.1.min.js"></script>
+    <script defer src="../assets/vendor/lamejs-1.2.1.min.js"></script>
+    <script defer src="../scripts/editor-mp3.js?v=20260728"></script>
   </head>
   <body data-page="mp3-editor">
+    <a class="skip-link" href="#main-content">편집기 본문으로 건너뛰기</a>
+
     <div class="page-shell">
       <header class="subpage-hero">
         <a class="back-link" href="../index.html">메인으로 돌아가기</a>
         <p class="eyebrow">EDITOR 07</p>
         <h1>MP3 Editor</h1>
         <p class="hero-copy">
-          MP3 파일을 브라우저 안에서 바로 다듬고, 파형 기준 자르기와 배속 미리듣기, 구간 분할과 MP3 내보내기까지
-          한 번에 처리합니다.
+          MP3 파일을 브라우저 안에서 바로 불러와 파형을 보고 자르기, 배속 미리 듣기, 구간 분할과 MP3 저장까지 한 번에 처리합니다.
         </p>
       </header>
 
-      <main>
-        <section class="tool-panel audio-editor-panel" data-audio-editor>
+      <main id="main-content" tabindex="-1">
+        <section class="tool-panel audio-editor-panel" data-audio-editor aria-busy="false">
           <div class="tool-heading">
             <p class="eyebrow">UPLOAD</p>
             <h2>편집할 MP3 업로드</h2>
-            <p>파형을 확인하며 구간을 자르고, 필요한 부분만 세그먼트로 나눠 MP3로 다시 저장할 수 있습니다.</p>
+            <p>파형을 확인하고 구간을 자른 뒤 필요한 부분만 세그먼트로 나누어 다시 MP3로 저장할 수 있습니다.</p>
           </div>
 
           <div class="uploader-box audio-uploader-box">
             <label class="upload-control">
-              <input type="file" accept="audio/mpeg,.mp3,audio/*" />
+              <input type="file" accept="audio/mpeg,.mp3" aria-label="MP3 파일 선택" />
               <span>MP3 파일 선택</span>
             </label>
             <div class="tool-actions">
-              <button type="button" data-action="export-selection" disabled>선택 구간 MP3 저장</button>
-              <button type="button" data-action="export-zip" disabled>구간 ZIP 저장</button>
+              <button type="button" data-action="export-selection" disabled aria-busy="false">선택 구간 MP3 저장</button>
+              <button type="button" data-action="export-zip" disabled aria-busy="false">구간 ZIP 저장</button>
               <button type="button" data-action="reset" disabled>편집 초기화</button>
             </div>
           </div>
 
-          <div class="audio-dropzone" data-role="dropzone">이곳에 MP3 파일을 올려보세요</div>
+          <p class="audio-helper" id="audio-file-help">
+            오디오는 브라우저 안에서 로컬로 처리됩니다. 편집 라이브러리도 이 사이트에 포함되어 있어 별도 CDN 연결이 필요하지 않습니다.
+            최대 파일 크기는 150MB입니다.
+          </p>
 
-          <p class="status-line" data-role="status" role="status" aria-live="polite" aria-atomic="true">
-            MP3 파일은 브라우저 안에서만 처리됩니다. 업로드 후 파형을 눌러 재생 위치를 옮길 수 있습니다.
+          <div
+            class="audio-dropzone"
+            data-role="dropzone"
+            role="button"
+            tabindex="0"
+            aria-label="MP3 파일 선택 또는 드래그 앤 드롭 영역 열기"
+            aria-describedby="audio-file-help"
+            aria-busy="false"
+          >
+            여기에 MP3 파일을 끌어놓거나 클릭, Enter, Space로 파일을 선택하세요.
+          </div>
+
+          <p
+            class="status-line"
+            data-role="status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-status-tone="info"
+          >
+            MP3 파일은 브라우저 안에서만 처리됩니다. 파일을 올리면 파형을 보고 재생 위치와 선택 구간을 바로 조정할 수 있습니다.
           </p>
 
           <div class="audio-editor-grid">
@@ -62,7 +90,23 @@
               </div>
 
               <div class="audio-wave-shell">
-                <canvas class="audio-wave-canvas" data-role="waveform"></canvas>
+                <p class="audio-helper" id="waveform-shortcuts">
+                  파형 포커스 후 좌우 화살표는 1초, Shift+좌우 화살표는 5초 이동합니다. Home/End는 처음과 끝으로 이동하고, Space는 재생 또는
+                  일시정지입니다.
+                </p>
+                <canvas
+                  class="audio-wave-canvas"
+                  data-role="waveform"
+                  tabindex="0"
+                  role="slider"
+                  aria-label="오디오 파형과 재생 위치"
+                  aria-describedby="waveform-shortcuts"
+                  aria-valuemin="0"
+                  aria-valuemax="0"
+                  aria-valuenow="0"
+                  aria-valuetext="오디오가 아직 로드되지 않았습니다."
+                  aria-disabled="true"
+                ></canvas>
                 <div class="audio-wave-overlay" data-role="wave-overlay" aria-hidden="true">
                   <div class="audio-wave-marker audio-wave-marker-current" data-role="playhead-marker"></div>
                   <div class="audio-wave-marker audio-wave-marker-origin" data-role="playhead-origin-marker">
@@ -72,7 +116,7 @@
                     <span class="audio-wave-marker-label" data-role="playhead-preview-label"></span>
                   </div>
                 </div>
-                <div class="audio-wave-empty" data-role="wave-empty">파형을 보려면 MP3 파일을 불러오세요</div>
+                <div class="audio-wave-empty" data-role="wave-empty">파형을 보려면 MP3 파일을 불러오세요.</div>
               </div>
 
               <div class="audio-wave-footer">
@@ -81,7 +125,7 @@
               </div>
 
               <div class="audio-transport">
-                <button type="button" data-action="play" disabled>재생 / 일시정지</button>
+                <button type="button" data-action="play" disabled aria-pressed="false">재생 / 일시정지</button>
                 <button type="button" data-action="stop" disabled>정지</button>
                 <button type="button" data-action="set-start" disabled>현재 위치를 시작으로</button>
                 <button type="button" data-action="set-end" disabled>현재 위치를 끝으로</button>
@@ -107,7 +151,7 @@
 
               <section class="audio-control-card">
                 <p class="eyebrow">SPEED</p>
-                <h3>배속 미리듣기 / 저장</h3>
+                <h3>배속 미리 듣기 / 저장</h3>
                 <label class="audio-single-field">
                   <span>배속</span>
                   <select data-role="playback-rate">
@@ -122,7 +166,7 @@
                 </label>
                 <label class="audio-checkbox">
                   <input type="checkbox" data-role="loop-preview" />
-                  <span>선택 구간 반복 미리듣기</span>
+                  <span>선택 구간 반복 미리 듣기</span>
                 </label>
               </section>
 
@@ -131,10 +175,10 @@
                 <h3>구간 저장</h3>
                 <label class="audio-single-field">
                   <span>구간 이름</span>
-                  <input type="text" data-role="segment-name" placeholder="인트로, 훅, 광고 컷" />
+                  <input type="text" data-role="segment-name" placeholder="인트로, 광고 컷, 클립 01" />
                 </label>
                 <button type="button" data-action="add-segment" disabled>현재 선택 구간 저장</button>
-                <p class="audio-helper">세그먼트 내보내기는 현재 배속 설정을 그대로 반영합니다.</p>
+                <p class="audio-helper">세그먼트 저장과 개별 MP3 내보내기는 현재 배속 설정을 그대로 반영합니다.</p>
               </section>
             </aside>
           </div>
@@ -143,7 +187,7 @@
             <div class="section-heading audio-section-heading">
               <p class="eyebrow">SEGMENTS</p>
               <h2>구간 편집기</h2>
-              <p>저장한 구간은 이름, 시작/끝 시간 수정, 개별 재생, MP3 저장, 삭제가 가능합니다.</p>
+              <p>저장한 구간은 이름 변경, 시작/끝 시간 수정, 개별 재생, MP3 저장, 삭제가 가능합니다.</p>
             </div>
 
             <div class="audio-segment-list" data-role="segment-list"></div>

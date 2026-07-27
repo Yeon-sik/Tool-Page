@@ -4,6 +4,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+const IMAGE_EDITOR_MAX_FILE_BYTES = 60 * 1024 * 1024;
+const IMAGE_EDITOR_MAX_PIXELS = 24_000_000;
+
 function initializeImageEditorPage() {
   const panel = document.querySelector("[data-image-editor]");
 
@@ -12,6 +15,7 @@ function initializeImageEditorPage() {
   }
 
   const elements = {
+    panel,
     input: panel.querySelector('input[type="file"]'),
     dropzone: panel.querySelector('[data-role="dropzone"]'),
     status: panel.querySelector('[data-role="status"]'),
@@ -32,11 +36,25 @@ function initializeImageEditorPage() {
     textInput: panel.querySelector('[data-role="text-input"]'),
     textColor: panel.querySelector('[data-role="text-color"]'),
     textSize: panel.querySelector('[data-role="text-size"]'),
+    textX: panel.querySelector('[data-role="text-x"]'),
+    textY: panel.querySelector('[data-role="text-y"]'),
     placeTextButton: panel.querySelector('[data-action="place-text"]'),
+    placeTextAtPositionButton: panel.querySelector('[data-action="place-text-at-position"]'),
     startCropButton: panel.querySelector('[data-action="start-crop"]'),
     applyCropButton: panel.querySelector('[data-action="apply-crop"]'),
     cancelCropButton: panel.querySelector('[data-action="cancel-crop"]'),
+    cropX: panel.querySelector('[data-role="crop-x"]'),
+    cropY: panel.querySelector('[data-role="crop-y"]'),
+    cropWidth: panel.querySelector('[data-role="crop-width"]'),
+    cropHeight: panel.querySelector('[data-role="crop-height"]'),
+    setCropValuesButton: panel.querySelector('[data-action="set-crop-values"]'),
     cropMeta: panel.querySelector('[data-role="crop-meta"]'),
+    exportFormat: panel.querySelector('[data-role="export-format"]'),
+    exportQuality: panel.querySelector('[data-role="export-quality"]'),
+    exportQualityLabel: panel.querySelector('[data-role="export-quality-label"]'),
+    exportQualityField: panel.querySelector('[data-role="export-quality-field"]'),
+    exportBackground: panel.querySelector('[data-role="export-background"]'),
+    exportBackgroundField: panel.querySelector('[data-role="export-background-field"]'),
   };
 
   if (Object.values(elements).some((element) => !element)) {
@@ -74,6 +92,24 @@ function bindImageEditorEvents(state) {
 
   elements.input.addEventListener("change", () => {
     void loadImageFile(state, Array.from(elements.input.files || [])[0] || null);
+  });
+
+  elements.dropzone.addEventListener("click", () => {
+    if (!state.isBusy) {
+      elements.input.click();
+    }
+  });
+
+  elements.dropzone.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!state.isBusy) {
+      elements.input.click();
+    }
   });
 
   elements.dropzone.addEventListener("dragenter", (event) => {
@@ -166,6 +202,17 @@ function bindImageEditorEvents(state) {
     setStatus(state, "캔버스에서 텍스트를 넣을 위치를 클릭해 주세요.");
   });
 
+  elements.placeTextAtPositionButton.addEventListener("click", () => {
+    if (!state.workingCanvas || state.isBusy) {
+      return;
+    }
+
+    addTextToImage(state, {
+      x: clamp(Number(elements.textX.value) || 0, 0, state.workingCanvas.width),
+      y: clamp(Number(elements.textY.value) || 0, 0, state.workingCanvas.height),
+    });
+  });
+
   elements.startCropButton.addEventListener("click", () => {
     if (!state.workingCanvas || state.isBusy) {
       return;
@@ -195,6 +242,24 @@ function bindImageEditorEvents(state) {
     applyCrop(state);
   });
 
+  elements.setCropValuesButton.addEventListener("click", () => {
+    if (!state.workingCanvas || state.isBusy) {
+      return;
+    }
+
+    const x = clamp(Number(elements.cropX.value) || 0, 0, Math.max(0, state.workingCanvas.width - 1));
+    const y = clamp(Number(elements.cropY.value) || 0, 0, Math.max(0, state.workingCanvas.height - 1));
+    const width = clamp(Number(elements.cropWidth.value) || 1, 1, state.workingCanvas.width - x);
+    const height = clamp(Number(elements.cropHeight.value) || 1, 1, state.workingCanvas.height - y);
+
+    state.cropMode = true;
+    state.pendingTextPlacement = false;
+    state.cropRect = { x, y, width, height };
+    updateImageEditorUI(state);
+    renderImageEditorCanvas(state);
+    setStatus(state, `입력한 영역 ${Math.round(width)} x ${Math.round(height)}px을 선택했습니다.`);
+  });
+
   elements.undoButton.addEventListener("click", () => {
     void undoLastEdit(state);
   });
@@ -206,6 +271,9 @@ function bindImageEditorEvents(state) {
   elements.downloadButton.addEventListener("click", () => {
     void downloadEditedImage(state);
   });
+
+  elements.exportFormat.addEventListener("change", () => updateImageEditorUI(state));
+  elements.exportQuality.addEventListener("input", () => updateImageEditorUI(state));
 
   elements.canvas.addEventListener("pointerdown", (event) => {
     if (!state.workingCanvas || state.isBusy) {
@@ -328,25 +396,52 @@ function bindImageEditorEvents(state) {
     addTextToImage(state, point);
   });
 
+  elements.canvas.addEventListener("keydown", (event) => handleImageCanvasKeydown(event, state));
+
+  window.addEventListener("keydown", (event) => {
+    if ((!event.ctrlKey && !event.metaKey) || event.key.toLowerCase() !== "z" || isEditableTarget(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    void undoLastEdit(state);
+  });
+
   window.addEventListener("resize", () => renderImageEditorCanvas(state));
 }
 
 async function loadImageFile(state, file) {
-  if (!file) {
+  if (!file || state.isBusy) {
     return;
   }
 
-  if (!file.type.startsWith("image/")) {
-    setStatus(state, "이미지 파일만 업로드할 수 있습니다.");
+  const hasSupportedType = !file.type || ["image/png", "image/jpeg", "image/webp"].includes(file.type);
+
+  if (!hasSupportedType || !/\.(png|jpe?g|webp)$/i.test(file.name)) {
+    setStatus(state, "PNG, JPG, WEBP 이미지 파일만 업로드할 수 있습니다.");
+    return;
+  }
+
+  if (file.size > IMAGE_EDITOR_MAX_FILE_BYTES) {
+    setStatus(state, `파일이 너무 큽니다. 이미지 편집기는 ${formatFileSize(IMAGE_EDITOR_MAX_FILE_BYTES)} 이하 파일을 지원합니다.`);
+    state.elements.input.value = "";
     return;
   }
 
   try {
     setBusy(state, true, "이미지를 불러오는 중입니다...");
     const image = await loadImageFromFile(file);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+
+    if (!width || !height || width * height > IMAGE_EDITOR_MAX_PIXELS) {
+      throw new Error("IMAGE_DIMENSION_LIMIT");
+    }
+
     state.file = file;
     state.workingCanvas = drawImageToCanvas(image);
-    state.originalSnapshot = captureCanvasSnapshot(state.workingCanvas);
+    delete state.elements.cropWidth.dataset.initialized;
+    state.originalSnapshot = await captureCanvasSnapshot(state.workingCanvas);
     state.history = [];
     state.zoom = 1;
     state.panX = 0;
@@ -359,7 +454,12 @@ async function loadImageFile(state, file) {
     setStatus(state, `${file.name} 이미지를 불러왔습니다. 편집을 시작해 보세요.`);
   } catch (error) {
     console.error(error);
-    setStatus(state, "이미지를 열지 못했습니다. 다른 파일로 다시 시도해 주세요.");
+    setStatus(
+      state,
+      error instanceof Error && error.message === "IMAGE_DIMENSION_LIMIT"
+        ? "이미지 해상도가 너무 큽니다. 안정적인 편집을 위해 가로×세로 2천4백만 픽셀 이하 이미지를 사용해 주세요."
+        : "이미지를 열지 못했습니다. 다른 파일로 다시 시도해 주세요."
+    );
   } finally {
     state.elements.input.value = "";
     setBusy(state, false);
@@ -376,38 +476,45 @@ function adjustZoom(state, delta) {
   renderImageEditorCanvas(state);
 }
 
-function rotateImage(state, degrees) {
+async function rotateImage(state, degrees) {
   if (!state.workingCanvas || state.isBusy) {
     return;
   }
 
-  pushHistoryState(state);
-  const current = state.workingCanvas;
-  const radians = (degrees * Math.PI) / 180;
-  const nextCanvas = document.createElement("canvas");
-  const swapSides = Math.abs(degrees) % 180 === 90;
+  try {
+    setBusy(state, true, "회전 전 편집 상태를 저장하는 중입니다...");
+    await pushHistoryState(state);
+    const current = state.workingCanvas;
+    const radians = (degrees * Math.PI) / 180;
+    const nextCanvas = document.createElement("canvas");
+    const swapSides = Math.abs(degrees) % 180 === 90;
 
-  nextCanvas.width = swapSides ? current.height : current.width;
-  nextCanvas.height = swapSides ? current.width : current.height;
+    nextCanvas.width = swapSides ? current.height : current.width;
+    nextCanvas.height = swapSides ? current.width : current.height;
 
-  const context = nextCanvas.getContext("2d");
+    const context = nextCanvas.getContext("2d");
 
-  if (!context) {
-    return;
+    if (!context) {
+      throw new Error("CANVAS_CONTEXT_UNAVAILABLE");
+    }
+
+    context.translate(nextCanvas.width / 2, nextCanvas.height / 2);
+    context.rotate(radians);
+    context.drawImage(current, -current.width / 2, -current.height / 2);
+
+    state.workingCanvas = nextCanvas;
+    resetViewState(state);
+    renderImageEditorCanvas(state);
+    setStatus(state, degrees > 0 ? "이미지를 오른쪽으로 회전했습니다." : "이미지를 왼쪽으로 회전했습니다.");
+  } catch (error) {
+    console.error(error);
+    setStatus(state, "이미지를 회전하지 못했습니다. 브라우저 메모리를 확인해 주세요.");
+  } finally {
+    setBusy(state, false);
   }
-
-  context.translate(nextCanvas.width / 2, nextCanvas.height / 2);
-  context.rotate(radians);
-  context.drawImage(current, -current.width / 2, -current.height / 2);
-
-  state.workingCanvas = nextCanvas;
-  resetViewState(state);
-  updateImageEditorUI(state);
-  renderImageEditorCanvas(state);
-  setStatus(state, degrees > 0 ? "이미지를 오른쪽으로 회전했습니다." : "이미지를 왼쪽으로 회전했습니다.");
 }
 
-function addTextToImage(state, point) {
+async function addTextToImage(state, point) {
   if (!state.workingCanvas || state.isBusy) {
     return;
   }
@@ -419,41 +526,48 @@ function addTextToImage(state, point) {
     return;
   }
 
-  pushHistoryState(state);
+  try {
+    setBusy(state, true, "텍스트 추가 전 편집 상태를 저장하는 중입니다...");
+    await pushHistoryState(state);
 
-  const context = state.workingCanvas.getContext("2d");
+    const context = state.workingCanvas.getContext("2d");
 
-  if (!context) {
-    return;
+    if (!context) {
+      throw new Error("CANVAS_CONTEXT_UNAVAILABLE");
+    }
+
+    const fontSize = clamp(Number(state.elements.textSize.value) || 42, 12, 160);
+    const color = state.elements.textColor.value || "#ffffff";
+    const lineHeight = Math.round(fontSize * 1.2);
+
+    context.save();
+    context.font = `700 ${fontSize}px "Malgun Gothic", system-ui, sans-serif`;
+    context.textBaseline = "top";
+    context.fillStyle = color;
+    context.strokeStyle = "rgba(0, 0, 0, 0.55)";
+    context.lineJoin = "round";
+    context.lineWidth = Math.max(2, Math.round(fontSize * 0.14));
+
+    text.split(/\r?\n/).forEach((line, index) => {
+      const y = point.y + index * lineHeight;
+      context.strokeText(line, point.x, y);
+      context.fillText(line, point.x, y);
+    });
+
+    context.restore();
+
+    state.pendingTextPlacement = false;
+    renderImageEditorCanvas(state);
+    setStatus(state, "텍스트를 이미지에 추가했습니다.");
+  } catch (error) {
+    console.error(error);
+    setStatus(state, "텍스트를 추가하지 못했습니다. 브라우저 메모리를 확인해 주세요.");
+  } finally {
+    setBusy(state, false);
   }
-
-  const fontSize = clamp(Number(state.elements.textSize.value) || 42, 12, 160);
-  const color = state.elements.textColor.value || "#ffffff";
-  const lineHeight = Math.round(fontSize * 1.2);
-
-  context.save();
-  context.font = `700 ${fontSize}px "Noto Sans KR", sans-serif`;
-  context.textBaseline = "top";
-  context.fillStyle = color;
-  context.strokeStyle = "rgba(0, 0, 0, 0.55)";
-  context.lineJoin = "round";
-  context.lineWidth = Math.max(2, Math.round(fontSize * 0.14));
-
-  text.split(/\r?\n/).forEach((line, index) => {
-    const y = point.y + index * lineHeight;
-    context.strokeText(line, point.x, y);
-    context.fillText(line, point.x, y);
-  });
-
-  context.restore();
-
-  state.pendingTextPlacement = false;
-  updateImageEditorUI(state);
-  renderImageEditorCanvas(state);
-  setStatus(state, "텍스트를 이미지에 추가했습니다.");
 }
 
-function applyCrop(state) {
+async function applyCrop(state) {
   if (!state.workingCanvas || !state.cropRect || state.isBusy) {
     return;
   }
@@ -470,37 +584,44 @@ function applyCrop(state) {
     return;
   }
 
-  pushHistoryState(state);
+  try {
+    setBusy(state, true, "자르기 전 편집 상태를 저장하는 중입니다...");
+    await pushHistoryState(state);
 
-  const nextCanvas = document.createElement("canvas");
-  nextCanvas.width = cropRect.width;
-  nextCanvas.height = cropRect.height;
+    const nextCanvas = document.createElement("canvas");
+    nextCanvas.width = cropRect.width;
+    nextCanvas.height = cropRect.height;
 
-  const context = nextCanvas.getContext("2d");
+    const context = nextCanvas.getContext("2d");
 
-  if (!context) {
-    return;
+    if (!context) {
+      throw new Error("CANVAS_CONTEXT_UNAVAILABLE");
+    }
+
+    context.drawImage(
+      state.workingCanvas,
+      cropRect.x,
+      cropRect.y,
+      cropRect.width,
+      cropRect.height,
+      0,
+      0,
+      cropRect.width,
+      cropRect.height
+    );
+
+    state.workingCanvas = nextCanvas;
+    state.cropMode = false;
+    state.cropRect = null;
+    resetViewState(state);
+    renderImageEditorCanvas(state);
+    setStatus(state, `이미지를 ${cropRect.width} x ${cropRect.height}px로 잘랐습니다.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(state, "이미지를 자르지 못했습니다. 브라우저 메모리를 확인해 주세요.");
+  } finally {
+    setBusy(state, false);
   }
-
-  context.drawImage(
-    state.workingCanvas,
-    cropRect.x,
-    cropRect.y,
-    cropRect.width,
-    cropRect.height,
-    0,
-    0,
-    cropRect.width,
-    cropRect.height
-  );
-
-  state.workingCanvas = nextCanvas;
-  state.cropMode = false;
-  state.cropRect = null;
-  resetViewState(state);
-  updateImageEditorUI(state);
-  renderImageEditorCanvas(state);
-  setStatus(state, `이미지를 ${cropRect.width} x ${cropRect.height}px로 잘랐습니다.`);
 }
 
 async function undoLastEdit(state) {
@@ -533,7 +654,7 @@ async function resetImageEditor(state) {
 
   try {
     setBusy(state, true, "원본 이미지로 초기화하는 중입니다...");
-    pushHistoryState(state);
+    await pushHistoryState(state);
     await restoreSnapshotToState(state, state.originalSnapshot);
     state.cropMode = false;
     state.cropRect = null;
@@ -555,13 +676,28 @@ async function downloadEditedImage(state) {
   }
 
   try {
-    setBusy(state, true, "편집한 이미지를 PNG로 저장하는 중입니다...");
-    const blob = await canvasToBlob(state.workingCanvas, "image/png");
-    downloadBlob(blob, buildEditedFileName(state.file));
-    setStatus(state, "편집한 이미지를 PNG로 저장했습니다.");
+    const exportOptions = getImageExportOptions(state);
+    setBusy(state, true, `편집한 이미지를 ${exportOptions.label}로 저장하는 중입니다...`);
+    const exportCanvas =
+      exportOptions.format === "jpeg"
+        ? flattenCanvas(state.workingCanvas, state.elements.exportBackground.value || "#ffffff")
+        : state.workingCanvas;
+    const blob = await canvasToBlob(exportCanvas, exportOptions.mimeType, exportOptions.quality);
+
+    if (blob.type && blob.type !== exportOptions.mimeType) {
+      throw new Error("UNSUPPORTED_EXPORT_FORMAT");
+    }
+
+    downloadBlob(blob, buildEditedFileName(state.file, exportOptions.extension));
+    setStatus(state, `편집한 이미지를 ${exportOptions.label}로 저장했습니다.`);
   } catch (error) {
     console.error(error);
-    setStatus(state, "이미지 저장에 실패했습니다.");
+    setStatus(
+      state,
+      error instanceof Error && error.message === "UNSUPPORTED_EXPORT_FORMAT"
+        ? "이 브라우저는 선택한 이미지 형식 저장을 지원하지 않습니다. PNG로 다시 시도해 주세요."
+        : "이미지 저장에 실패했습니다."
+    );
   } finally {
     setBusy(state, false);
   }
@@ -664,8 +800,19 @@ function updateImageEditorUI(state) {
   elements.canvas.classList.toggle("is-crop-mode", state.cropMode);
   elements.canvas.classList.toggle("is-text-mode", state.pendingTextPlacement);
   elements.canvas.classList.toggle("is-pan-mode", hasImage && state.zoom > 1 && !state.cropMode && !state.pendingTextPlacement);
+  elements.canvas.setAttribute(
+    "aria-label",
+    hasImage
+      ? `${state.file?.name || "이미지"} 편집 미리보기, ${state.workingCanvas.width} x ${state.workingCanvas.height}, 확대 ${Math.round(
+          state.zoom * 100
+        )}%. 방향키로 이동하고 더하기·빼기 키로 확대 또는 축소합니다.`
+      : "이미지를 불러오면 편집 미리보기가 표시됩니다."
+  );
 
   elements.undoButton.disabled = !state.history.length || state.isBusy;
+  elements.input.disabled = state.isBusy;
+  elements.dropzone.setAttribute("aria-busy", String(state.isBusy));
+  elements.dropzone.setAttribute("aria-disabled", String(state.isBusy));
   elements.resetButton.disabled = !hasImage || state.isBusy;
   elements.downloadButton.disabled = !hasImage || state.isBusy;
   elements.zoomOutButton.disabled = !canEdit;
@@ -674,12 +821,46 @@ function updateImageEditorUI(state) {
   elements.rotateRightButton.disabled = !canEdit;
   elements.zoomRange.disabled = !canEdit;
   elements.placeTextButton.disabled = !canEdit;
+  elements.placeTextAtPositionButton.disabled = !canEdit;
   elements.startCropButton.disabled = !canEdit;
   elements.applyCropButton.disabled = !hasCropRect || state.isBusy;
   elements.cancelCropButton.disabled = (!state.cropMode && !hasCropRect) || state.isBusy;
+  elements.setCropValuesButton.disabled = !canEdit;
   elements.textInput.disabled = !canEdit;
   elements.textColor.disabled = !canEdit;
   elements.textSize.disabled = !canEdit;
+  elements.textX.disabled = !canEdit;
+  elements.textY.disabled = !canEdit;
+  elements.cropX.disabled = !canEdit;
+  elements.cropY.disabled = !canEdit;
+  elements.cropWidth.disabled = !canEdit;
+  elements.cropHeight.disabled = !canEdit;
+  elements.exportFormat.disabled = !canEdit;
+  elements.exportQuality.disabled = !canEdit;
+  elements.exportBackground.disabled = !canEdit;
+
+  if (hasImage) {
+    elements.textX.max = String(state.workingCanvas.width);
+    elements.textY.max = String(state.workingCanvas.height);
+    elements.cropX.max = String(Math.max(0, state.workingCanvas.width - 1));
+    elements.cropY.max = String(Math.max(0, state.workingCanvas.height - 1));
+    elements.cropWidth.max = String(state.workingCanvas.width);
+    elements.cropHeight.max = String(state.workingCanvas.height);
+
+    if (!elements.cropWidth.dataset.initialized) {
+      elements.cropWidth.value = String(state.workingCanvas.width);
+      elements.cropHeight.value = String(state.workingCanvas.height);
+      elements.cropWidth.dataset.initialized = "true";
+    }
+  } else {
+    delete elements.cropWidth.dataset.initialized;
+  }
+
+  const exportOptions = getImageExportOptions(state);
+  elements.downloadButton.textContent = `${exportOptions.label} 저장`;
+  elements.exportQualityLabel.textContent = `${Math.round(exportOptions.quality * 100)}%`;
+  elements.exportQualityField.hidden = exportOptions.format === "png";
+  elements.exportBackgroundField.hidden = exportOptions.format !== "jpeg";
 
   if (!hasCropRect) {
     elements.cropMeta.textContent = state.cropMode
@@ -687,7 +868,60 @@ function updateImageEditorUI(state) {
       : "선택된 영역이 없습니다.";
   } else {
     elements.cropMeta.textContent = `${Math.round(state.cropRect.width)} x ${Math.round(state.cropRect.height)} px 선택됨`;
+    elements.cropX.value = String(Math.round(state.cropRect.x));
+    elements.cropY.value = String(Math.round(state.cropRect.y));
+    elements.cropWidth.value = String(Math.round(state.cropRect.width));
+    elements.cropHeight.value = String(Math.round(state.cropRect.height));
   }
+}
+
+function handleImageCanvasKeydown(event, state) {
+  if (!state.workingCanvas || state.isBusy) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    if (state.cropMode || state.cropRect || state.pendingTextPlacement) {
+      event.preventDefault();
+      state.cropMode = false;
+      state.cropRect = null;
+      state.pendingTextPlacement = false;
+      updateImageEditorUI(state);
+      renderImageEditorCanvas(state);
+      setStatus(state, "현재 편집 모드를 취소했습니다.");
+    }
+    return;
+  }
+
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    adjustZoom(state, 0.1);
+    return;
+  }
+
+  if (event.key === "-" || event.key === "_") {
+    event.preventDefault();
+    adjustZoom(state, -0.1);
+    return;
+  }
+
+  const movement = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  }[event.key];
+
+  if (!movement || state.zoom <= 1) {
+    return;
+  }
+
+  event.preventDefault();
+  const distance = event.shiftKey ? 40 : 12;
+  state.panX += movement[0] * distance;
+  state.panY += movement[1] * distance;
+  renderImageEditorCanvas(state);
+  setStatus(state, `이미지 보기 위치를 ${event.shiftKey ? "크게 " : ""}이동했습니다.`);
 }
 
 function getImagePointFromPointer(state, event) {
@@ -730,16 +964,30 @@ function normalizeRect(startX, startY, endX, endY) {
   };
 }
 
-function pushHistoryState(state) {
+async function pushHistoryState(state) {
   if (!state.workingCanvas) {
     return;
   }
 
-  state.history.push(captureCanvasSnapshot(state.workingCanvas));
+  state.history.push(await captureCanvasSnapshot(state.workingCanvas));
 
-  if (state.history.length > 24) {
+  if (state.history.length > getImageHistoryLimit(state.workingCanvas)) {
     state.history.shift();
   }
+}
+
+function getImageHistoryLimit(canvas) {
+  const pixels = canvas.width * canvas.height;
+
+  if (pixels > 16_000_000) {
+    return 2;
+  }
+
+  if (pixels > 8_000_000) {
+    return 4;
+  }
+
+  return 12;
 }
 
 async function restoreSnapshotToState(state, snapshot) {
@@ -747,8 +995,14 @@ async function restoreSnapshotToState(state, snapshot) {
     return;
   }
 
-  const image = await loadImageFromSource(snapshot.dataUrl);
-  state.workingCanvas = drawImageToCanvas(image, snapshot.width, snapshot.height);
+  const url = URL.createObjectURL(snapshot.blob);
+
+  try {
+    const image = await loadImageFromSource(url);
+    state.workingCanvas = drawImageToCanvas(image, snapshot.width, snapshot.height);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
   resetViewState(state);
 }
 
@@ -758,11 +1012,13 @@ function resetViewState(state) {
   state.panY = 0;
 }
 
-function captureCanvasSnapshot(canvas) {
+async function captureCanvasSnapshot(canvas) {
+  const blob = await canvasToBlob(canvas, "image/png", 1);
+
   return {
     width: canvas.width,
     height: canvas.height,
-    dataUrl: canvas.toDataURL("image/png"),
+    blob,
   };
 }
 
@@ -795,7 +1051,7 @@ function loadImageFromSource(source) {
   });
 }
 
-function canvasToBlob(canvas, mimeType) {
+function canvasToBlob(canvas, mimeType, quality = 0.92) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
@@ -804,22 +1060,23 @@ function canvasToBlob(canvas, mimeType) {
       }
 
       resolve(blob);
-    }, mimeType);
+    }, mimeType, quality);
   });
 }
 
-function buildEditedFileName(file) {
+function buildEditedFileName(file, extension = "png") {
   const baseName = String(file?.name || "image")
     .replace(/\.[^.]+$/, "")
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  return `${baseName || "image"}-edited.png`;
+  return `${baseName || "image"}-edited.${extension}`;
 }
 
 function setBusy(state, isBusy, message = "") {
   state.isBusy = isBusy;
+  state.elements.panel.setAttribute("aria-busy", String(isBusy));
 
   if (message) {
     setStatus(state, message);
@@ -832,6 +1089,54 @@ function setStatus(state, message) {
   state.elements.status.textContent = message;
 }
 
+function getImageExportOptions(state) {
+  const format = ["jpeg", "webp"].includes(state.elements.exportFormat.value)
+    ? state.elements.exportFormat.value
+    : "png";
+  const quality = clamp(Number(state.elements.exportQuality.value) || 0.92, 0.6, 1);
+
+  if (format === "jpeg") {
+    return { format, extension: "jpg", label: "JPG", mimeType: "image/jpeg", quality };
+  }
+
+  if (format === "webp") {
+    return { format, extension: "webp", label: "WEBP", mimeType: "image/webp", quality };
+  }
+
+  return { format: "png", extension: "png", label: "PNG", mimeType: "image/png", quality: 1 };
+}
+
+function flattenCanvas(sourceCanvas, backgroundColor) {
+  const canvas = document.createElement("canvas");
+  canvas.width = sourceCanvas.width;
+  canvas.height = sourceCanvas.height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Canvas export failed");
+  }
+
+  context.fillStyle = backgroundColor;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(sourceCanvas, 0, 0);
+  return canvas;
+}
+
+function isEditableTarget(target) {
+  return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable=true]"));
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** unitIndex;
+  return `${value >= 10 || unitIndex === 0 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
 function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -840,7 +1145,7 @@ function downloadBlob(blob, fileName) {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function roundNumber(value, digits = 0) {
